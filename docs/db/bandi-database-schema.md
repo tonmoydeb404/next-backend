@@ -3,7 +3,7 @@
 > **Engine:** PostgreSQL (Supabase)
 > **RLS:** Enabled on every table
 > **Language:** All table names, column names and values in English
-> **Depends on:** [auth-database-schema.md](auth-database-schema.md) (`profiles`, `agencies`), [geography-database-schema.md](geography-database-schema.md) (`regions`, `provinces`), [assets-database-schema.md](assets-database-schema.md) (`assets`)
+> **Depends on:** [auth-database-schema.md](auth-database-schema.md) (`profiles`, `tenants`), [geography-database-schema.md](geography-database-schema.md) (`regions`, `provinces`), [assets-database-schema.md](assets-database-schema.md) (`assets`)
 > **See also:** [grant-newsletter-schema.md](grant-newsletter-schema.md) (newsletter sends & recipients)
 
 ---
@@ -59,7 +59,7 @@
 | --------- | ----------------------------- |
 | `private` | Only visible to the author    |
 | `team`    | Visible to all internal staff |
-| `public`  | Visible to agencies too       |
+| `public`  | Visible to tenants too        |
 
 ### `suggestion_status`
 
@@ -84,40 +84,40 @@
 
 Core entity representing a grant / incentive.
 
-| Column                     | Type          | Nullable | Default             | Description                                                                                               |
-| -------------------------- | ------------- | -------- | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| `id`                       | uuid          | NO       | `gen_random_uuid()` | PK                                                                                                        |
-| `agency_id`                | uuid          | YES      | —                   | FK → `agencies(id)`. Set only for white-label grants published for one agency; NULL = platform-wide grant |
-| `title`                    | text          | NO       | —                   | Grant title                                                                                               |
-| `slug`                     | text          | YES      | —                   | URL-friendly slug (UNIQUE)                                                                                |
-| `status`                   | grant_status  | NO       | `'draft'`           | Workflow status — the single source of truth for publication state                                        |
-| `creation_mode`            | creation_mode | NO       | `'manual'`          | How this grant was created                                                                                |
-| **Display flags**          |               |          |                     |                                                                                                           |
-| `is_pinned`                | boolean       | NO       | `false`             | Pinned to top of list                                                                                     |
-| `is_recurring`             | boolean       | NO       | `false`             | Recurring grant flag                                                                                      |
-| `is_featured_home`         | boolean       | NO       | `false`             | Featured on homepage                                                                                      |
-| `requires_manual_download` | boolean       | NO       | `false`             | Documents need manual download (no direct link)                                                           |
-| **Extraction data**        |               |          |                     |                                                                                                           |
-| `general_info`             | jsonb         | YES      | —                   | Who can apply, key dates, SEO elements (structured extraction)                                            |
-| `funding`                  | jsonb         | YES      | —                   | Funding amounts & per-contribution requirements                                                           |
-| **Eligibility geography**  |               |          |                     |                                                                                                           |
-| `regions`                  | text[]        | YES      | —                   | Eligible region codes, references `regions(code)`. NULL = all of Italy                                    |
-| `provinces`                | text[]        | YES      | —                   | Eligible province codes, references `provinces(code)`                                                     |
-| **Dates**                  |               |          |                     |                                                                                                           |
-| `opens_at`                 | timestamptz   | YES      | —                   | Opening date                                                                                              |
-| `deadline_at`              | timestamptz   | YES      | —                   | Deadline date                                                                                             |
-| `dates_refreshed_at`       | timestamptz   | YES      | —                   | Last time opening/deadline dates were re-verified against the source                                      |
-| **Links**                  |               |          |                     |                                                                                                           |
-| `links`                    | jsonb         | YES      | —                   | `{source_url, published_url, typeform_url, image_url, video_url, external_link}`                          |
-| **Recurring grouping**     |               |          |                     |                                                                                                           |
-| `recurring_family_id`      | uuid          | YES      | —                   | Groups recurring grant editions together                                                                  |
-| `recurring_position`       | integer       | YES      | —                   | Position within the recurring family                                                                      |
-| **Audit trail**            |               |          |                     |                                                                                                           |
-| `created_by`               | uuid          | YES      | —                   | FK → `profiles(id)`, creator                                                                              |
-| `published_by`             | uuid          | YES      | —                   | FK → `profiles(id)`, publisher                                                                            |
-| `published_at`             | timestamptz   | YES      | —                   | First-publish timestamp (kept even if later archived)                                                     |
-| `created_at`               | timestamptz   | NO       | `now()`             | Row creation timestamp                                                                                    |
-| `updated_at`               | timestamptz   | NO       | `now()`             | Auto-updated via trigger                                                                                  |
+| Column                     | Type          | Nullable | Default             | Description                                                                                              |
+| -------------------------- | ------------- | -------- | ------------------- | -------------------------------------------------------------------------------------------------------- |
+| `id`                       | uuid          | NO       | `gen_random_uuid()` | PK                                                                                                       |
+| `tenant_id`                | uuid          | YES      | —                   | FK → `tenants(id)`. Set only for white-label grants published for one tenant; NULL = platform-wide grant |
+| `title`                    | text          | NO       | —                   | Grant title                                                                                              |
+| `slug`                     | text          | YES      | —                   | URL-friendly slug (UNIQUE)                                                                               |
+| `status`                   | grant_status  | NO       | `'draft'`           | Workflow status — the single source of truth for publication state                                       |
+| `creation_mode`            | creation_mode | NO       | `'manual'`          | How this grant was created                                                                               |
+| **Display flags**          |               |          |                     |                                                                                                          |
+| `is_pinned`                | boolean       | NO       | `false`             | Pinned to top of list                                                                                    |
+| `is_recurring`             | boolean       | NO       | `false`             | Recurring grant flag                                                                                     |
+| `is_featured_home`         | boolean       | NO       | `false`             | Featured on homepage                                                                                     |
+| `requires_manual_download` | boolean       | NO       | `false`             | Documents need manual download (no direct link)                                                          |
+| **Extraction data**        |               |          |                     |                                                                                                          |
+| `general_info`             | jsonb         | YES      | —                   | Who can apply, key dates, SEO elements (structured extraction)                                           |
+| `funding`                  | jsonb         | YES      | —                   | Funding amounts & per-contribution requirements                                                          |
+| **Eligibility geography**  |               |          |                     |                                                                                                          |
+| `regions`                  | text[]        | YES      | —                   | Eligible region codes, references `regions(code)`. NULL = all of Italy                                   |
+| `provinces`                | text[]        | YES      | —                   | Eligible province codes, references `provinces(code)`                                                    |
+| **Dates**                  |               |          |                     |                                                                                                          |
+| `opens_at`                 | timestamptz   | YES      | —                   | Opening date                                                                                             |
+| `deadline_at`              | timestamptz   | YES      | —                   | Deadline date                                                                                            |
+| `dates_refreshed_at`       | timestamptz   | YES      | —                   | Last time opening/deadline dates were re-verified against the source                                     |
+| **Links**                  |               |          |                     |                                                                                                          |
+| `links`                    | jsonb         | YES      | —                   | `{source_url, published_url, typeform_url, image_url, video_url, external_link}`                         |
+| **Recurring grouping**     |               |          |                     |                                                                                                          |
+| `recurring_family_id`      | uuid          | YES      | —                   | Groups recurring grant editions together                                                                 |
+| `recurring_position`       | integer       | YES      | —                   | Position within the recurring family                                                                     |
+| **Audit trail**            |               |          |                     |                                                                                                          |
+| `created_by`               | uuid          | YES      | —                   | FK → `profiles(id)`, creator                                                                             |
+| `published_by`             | uuid          | YES      | —                   | FK → `profiles(id)`, publisher                                                                           |
+| `published_at`             | timestamptz   | YES      | —                   | First-publish timestamp (kept even if later archived)                                                    |
+| `created_at`               | timestamptz   | NO       | `now()`             | Row creation timestamp                                                                                   |
+| `updated_at`               | timestamptz   | NO       | `now()`             | Auto-updated via trigger                                                                                 |
 
 **Removed vs. the original schema (redundancy cleanup):**
 
@@ -133,7 +133,7 @@ Core entity representing a grant / incentive.
 
 - PK on `id`
 - UNIQUE on `slug`
-- `idx_grants_agency` on `agency_id`
+- `idx_grants_tenant` on `tenant_id`
 - `idx_grants_status` on `status`
 - `idx_grants_recurring_family` on `recurring_family_id`
 - GIN index on `regions`
@@ -191,12 +191,12 @@ Structured extraction of who can apply, key dates, SEO elements, and procedural 
   "beneficiaries": {
     "notes": "Ammesse anche cooperative sociali",
     "citations": ["Art. 2"],
+    "ateco_version": "2025",
     "subsectors": [
       {
         "type": "included",
-        "match": "attivita_manifatturiere",
-        "value": "C - Attività manifatturiere",
-        "brief_explanation": "Imprese del settore manifatturiero"
+        "value": "10.11.00",
+        "brief_explanation": "Lavorazione e conservazione di carne (escluso pollame)"
       }
     ],
     "company_sizes": ["microimpresa", "piccola_impresa", "media_impresa"],
@@ -343,6 +343,8 @@ Funding amounts, per-contribution eligibility requirements, and the overall gran
 - `new_business_scenario` is nullable per contribution — only present for grants targeting new business creation (avvio impresa). Its fields are projected into `grant_match_criteria.applicant_kind_rules` by `scripts/populate-match-criteria.mjs`.
 - `seo_elements` fields can be either a plain string or `{value, seo_optimization}` — consumers must handle both forms.
 - `geographic_scope` inside `local_area` is optional — when absent, derived heuristically from `regions[]` length (`>= 20` → nazionale, `0` → nazionale, else regionale).
+- `beneficiaries.subsectors[].value` stores the raw ATECO code (references `ateco.code`, any level — section, division, group, class or subclass) per client confirmation. Display labels are looked up from `ateco.title_it`/`ateco.title_en` at read time. The extraction schema's earlier `match` slug field has been dropped — it wasn't consumed by any matching/filtering logic (see [matching-database-schema.md](matching-database-schema.md#5-value-translation-notes)).
+- `beneficiaries.ateco_version` records which ATECO version (e.g. `"2025"`) all `subsectors[].value` codes in this grant belong to — since `ateco`'s PK is composite `(code, version)`, a code alone isn't enough to resolve a title or walk `ateco.parent_code`. Mirrors the same single-source-of-truth pattern as `subjects.ateco_version`. All subsectors in a grant share one version, since they're extracted together at the same time.
 
 **`links` shape:**
 
@@ -508,8 +510,8 @@ Junction table linking grants to their files. Replaces the old `grant_documents`
 
 **Notes:**
 
-- Agencies do not get a separate SELECT policy — they see published grants through the same public-read policy (consulting firms are read-only consumers, not owners of grant content).
-- `agency_id` exists only to scope a white-label grant to one agency's branding; it does not grant that agency write access.
+- Tenants do not get a separate SELECT policy — they see published grants through the same public-read policy (consulting firms are read-only consumers, not owners of grant content).
+- `tenant_id` exists only to scope a white-label grant to one tenant's branding; it does not grant that tenant write access.
 
 ### `grant_faq`, `grant_tags`, `grant_tag_assignments`
 
@@ -533,7 +535,7 @@ Junction table linking grants to their files. Replaces the old `grant_documents`
 
 **Notes:**
 
-- These are internal editorial-workflow tables (edit version history, staff assignments, internal notes) — never exposed publicly or to agencies.
+- These are internal editorial-workflow tables (edit version history, staff assignments, internal notes) — never exposed publicly or to tenants.
 - `grant_suggestions` additionally allows the suggesting profile to INSERT their own row and SELECT it back (`suggested_by = auth.uid()`), even if not internal — anyone with an account can suggest a grant.
 
 ---
@@ -541,7 +543,7 @@ Junction table linking grants to their files. Replaces the old `grant_documents`
 ## 4. Entity Relationship
 
 ```
-agencies (agency_id, optional)        profiles (created_by/published_by/etc.)
+tenants (tenant_id, optional)        profiles (created_by/published_by/etc.)
      │                                       │
      └───────────────┬───────────────────────┘
                       ▼
@@ -610,7 +612,7 @@ agencies (agency_id, optional)        profiles (created_by/published_by/etc.)
 
 | Current column                                                                  | New column                 | Notes                                                                                                    |
 | ------------------------------------------------------------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `organization_id`                                                               | `agency_id`                | Rename FK (now → `agencies(id)`)                                                                         |
+| `organization_id`                                                               | `tenant_id`                | Rename FK (now → `tenants(id)`, 2nd generation was `agency_id`)                                          |
 | `is_published`                                                                  | —                          | DROP (redundant with `status = 'published'`)                                                             |
 | `is_newsletter_sent`                                                            | —                          | DROP (newsletter state lives in grant-newsletter-schema)                                                 |
 | `newsletter_sent_at`                                                            | —                          | DROP (same)                                                                                              |

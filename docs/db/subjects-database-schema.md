@@ -10,6 +10,7 @@
 
 1. [Enums](#1-enums)
 2. [Tables](#2-tables)
+   - [companies](#companies)
    - [subjects](#subjects)
    - [subject_shareholders](#subject_shareholders)
    - [subject_operational_sites](#subject_operational_sites)
@@ -17,7 +18,6 @@
    - [subject_participations](#subject_participations)
    - [subject_intents](#subject_intents)
    - [subject_investment_projects](#subject_investment_projects)
-   - [subject_openapi_cache](#subject_openapi_cache)
 3. [Triggers](#3-triggers)
 4. [RLS Policies](#4-rls-policies)
 5. [Entity Relationship](#5-entity-relationship)
@@ -104,22 +104,64 @@
 
 ## 2. Tables
 
+### `companies`
+
+Shared company identity registry. Holds `company_name` / `vat_code` / `tax_code` once per real-world company so multiple `subjects` rows (different owners/tenants working the same VAT) can reuse it instead of duplicating identity data. Also absorbs the cached raw OpenAPI response for that VAT (formerly `subject_openapi_cache`), since the cache is a property of the company/VAT, not of any individual tenant's `subjects` row — sharing it across subjects avoids re-fetching the same paid API response.
+
+| Column             | Type        | Nullable | Default             | Description                                         |
+| ------------------ | ----------- | -------- | ------------------- | --------------------------------------------------- |
+| `id`               | uuid        | NO       | `gen_random_uuid()` | PK                                                  |
+| `vat_code`         | text        | YES      | —                   | VAT number (P.IVA)                                  |
+| `tax_code`         | text        | YES      | —                   | Fiscal code                                         |
+| `company_name`     | text        | YES      | —                   | Company / display name                              |
+| **Registry cache** |             |          |                     |                                                     |
+| `payload`          | jsonb       | YES      | —                   | Full raw response from the registry lookup provider |
+| `payload_meta`     | jsonb       | YES      | —                   | Fetch metadata for `payload` (see shape below)      |
+| `fetched_at`       | timestamptz | YES      | —                   | Last fetch timestamp                                |
+| `created_at`       | timestamptz | NO       | `now()`             | Row creation timestamp                              |
+| `updated_at`       | timestamptz | NO       | `now()`             | Auto-updated via trigger                            |
+
+**Constraints:**
+
+- UNIQUE on `vat_code` WHERE `vat_code IS NOT NULL`
+
+**Indexes:**
+
+- PK on `id`
+- `idx_companies_vat` on `vat_code`
+
+**Notes:**
+
+- Referenced N:1 from `subjects.company_id` — one `companies` row can back multiple `subjects` rows.
+- Writes should go through a `find_or_create_company(p_vat_code, p_tax_code, p_company_name)` SECURITY DEFINER RPC that upserts on `vat_code` conflict, rather than direct client INSERT/UPDATE, since a shared row can be linked from subjects owned by unrelated parties.
+- `payload` / `payload_meta` / `fetched_at` are internal-only (raw provider data, cost info) — client-facing reads of `companies` must go through a view/select list that excludes them, since RLS is row-level and the linked-tenant SELECT policy would otherwise expose them.
+
+**`payload_meta` shape:**
+
+```json
+{
+  "tier": "it_advanced",
+  "payload_hash": "sha256:...",
+  "cost_eur": 0.15,
+  "expires_at": "2026-11-03T00:00:00Z"
+}
+```
+
+---
+
 ### `subjects`
 
-The core business entity — a company, freelancer, or aspiring entrepreneur that gets matched against bandi. Owned by either a customer (direct) or an agency member.
+The core business entity — a company, freelancer, or aspiring entrepreneur that gets matched against bandi. Always owned by a tenant — either the profile's own personal tenant, or an org tenant they hold a seat on (see [auth-database-schema.md](auth-database-schema.md)).
 
 | Column                               | Type         | Nullable | Default                | Description                                                                           |
 | ------------------------------------ | ------------ | -------- | ---------------------- | ------------------------------------------------------------------------------------- |
 | `id`                                 | uuid         | NO       | `gen_random_uuid()`    | PK                                                                                    |
-| `owner_profile_id`                   | uuid         | YES      | —                      | FK → `profiles(id)`. Customer or agency member who owns this subject                  |
-| `agency_id`                          | uuid         | YES      | —                      | FK → `agencies(id)` ON DELETE CASCADE. Set when managed by an agency                  |
+| `tenant_id`                          | uuid         | NO       | —                      | FK → `tenants(id)` ON DELETE CASCADE. The owning tenant (personal or org)             |
 | `subject_type`                       | subject_type | NO       | `'registered_company'` | Entity type                                                                           |
 | `data_source`                        | data_source  | NO       | `'manual'`             | Data provenance                                                                       |
 | `is_primary`                         | boolean      | NO       | `true`                 | Primary subject for the owner                                                         |
 | **Company identity**                 |              |          |                        |                                                                                       |
-| `company_name`                       | text         | YES      | —                      | Company / display name                                                                |
-| `vat_code`                           | text         | YES      | —                      | VAT number (P.IVA)                                                                    |
-| `tax_code`                           | text         | YES      | —                      | Fiscal code                                                                           |
+| `company_id`                         | uuid         | YES      | —                      | FK → `companies(id)` ON DELETE SET NULL. Shared identity (name, VAT, tax code)        |
 | `activity_status`                    | text         | YES      | —                      | Activity status (active, suspended, etc.)                                             |
 | `is_ceased`                          | boolean      | YES      | —                      | Company has ceased activity                                                           |
 | `has_bankruptcy`                     | boolean      | YES      | —                      | Bankruptcy proceedings flag                                                           |
@@ -162,15 +204,13 @@ The core business entity — a company, freelancer, or aspiring entrepreneur tha
 
 **Constraints:**
 
-- UNIQUE on `vat_code` WHERE `vat_code IS NOT NULL`
-- CHECK: `owner_profile_id IS NOT NULL OR agency_id IS NOT NULL` (must have an owner)
+(none additional — `tenant_id NOT NULL` guarantees every subject has an owner)
 
 **Indexes:**
 
 - PK on `id`
-- `idx_subjects_owner` on `owner_profile_id`
-- `idx_subjects_agency` on `agency_id`
-- `idx_subjects_vat` on `vat_code`
+- `idx_subjects_tenant` on `tenant_id`
+- `idx_subjects_company` on `company_id`
 - `idx_subjects_type` on `subject_type`
 - `idx_subjects_ateco_division` on `ateco_division`
 
@@ -453,33 +493,11 @@ Structured investment plans. Used for macro_area matching boost in the matching 
 
 ---
 
-### `subject_openapi_cache`
-
-Cached raw OpenAPI response. One row per subject. Expires after 90 days.
-
-| Column         | Type        | Nullable | Default             | Description                                    |
-| -------------- | ----------- | -------- | ------------------- | ---------------------------------------------- |
-| `id`           | uuid        | NO       | `gen_random_uuid()` | PK                                             |
-| `subject_id`   | uuid        | NO       | —                   | FK → `subjects(id)` ON DELETE CASCADE (UNIQUE) |
-| `api_tier`     | text        | NO       | —                   | API tier used (e.g. `it_advanced`)             |
-| `vat_code`     | text        | NO       | —                   | Queried VAT code                               |
-| `payload`      | jsonb       | NO       | —                   | Full API response                              |
-| `payload_hash` | text        | YES      | —                   | Payload hash for dedup                         |
-| `cost_eur`     | numeric     | YES      | —                   | Cost per fetch (EUR)                           |
-| `fetched_at`   | timestamptz | NO       | `now()`             | Fetch timestamp                                |
-| `expires_at`   | timestamptz | NO       | —                   | Expiry timestamp (fetched_at + 90d)            |
-
-**Constraints:**
-
-- UNIQUE on `subject_id`
-
----
-
 ## 3. Triggers
 
 ### `enforce_single_primary` — One primary subject per owner
 
-Fires `BEFORE INSERT OR UPDATE ON subjects`. Ensures only one row has `is_primary = true` per `owner_profile_id`.
+Fires `BEFORE INSERT OR UPDATE ON subjects`. Ensures only one row has `is_primary = true` per `tenant_id`.
 
 ### `limit_investment_projects` — Max 10 projects per subject
 
@@ -487,59 +505,72 @@ Fires `BEFORE INSERT ON subject_investment_projects`. Rejects if count >= 10 for
 
 ### `update_updated_at` — Timestamp maintenance
 
-Fires `BEFORE UPDATE` on all tables in this group. Sets `updated_at = now()`.
+Fires `BEFORE UPDATE` on all tables in this group, including `companies`. Sets `updated_at = now()`.
 
 ---
 
 ## 4. RLS Policies
 
+### `companies`
+
+Rows can be linked from `subjects` owned by unrelated parties, so access is derived via the `subjects` join rather than direct ownership.
+
+| Policy                     | Operation | Rule                                                                        |
+| -------------------------- | --------- | --------------------------------------------------------------------------- |
+| Linked tenant sees company | SELECT    | `id IN (SELECT company_id FROM subjects WHERE is_tenant_member(tenant_id))` |
+| Internal sees all          | SELECT    | `is_internal()`                                                             |
+| Internal manages all       | ALL       | `is_internal()`                                                             |
+
+**Notes:**
+
+- No direct client INSERT/UPDATE policy — writes go through the `find_or_create_company(p_vat_code, p_tax_code, p_company_name)` SECURITY DEFINER RPC, which upserts on `vat_code` conflict and returns the `id` to store on `subjects.company_id`. This avoids one owner silently overwriting identity data another unrelated owner's subject also relies on.
+
 ### `subjects`
 
-| Policy                          | Operation | Rule                                                                              |
-| ------------------------------- | --------- | --------------------------------------------------------------------------------- |
-| Owner sees own subjects         | SELECT    | `owner_profile_id = auth.uid()`                                                   |
-| Agency sees own agency subjects | SELECT    | `agency_id = get_my_agency_id()`                                                  |
-| Internal sees all               | SELECT    | `is_internal()`                                                                   |
-| Owner manages own subjects      | ALL       | `owner_profile_id = auth.uid()`                                                   |
-| Agency member manages           | ALL       | `agency_id = get_my_agency_id()` AND caller's `org_role IN ('owner', 'operator')` |
-| Internal manages all            | ALL       | `is_internal()`                                                                   |
+| Policy                     | Operation | Rule                                                                                     |
+| -------------------------- | --------- | ---------------------------------------------------------------------------------------- |
+| Tenant sees own subjects   | SELECT    | `is_tenant_member(tenant_id)`                                                            |
+| Internal sees all          | SELECT    | `is_internal()`                                                                          |
+| Tenant seat holder manages | ALL       | `is_tenant_member(tenant_id)` AND `get_my_seat_role(tenant_id) IN ('owner', 'operator')` |
+| Internal manages all       | ALL       | `is_internal()`                                                                          |
 
 ### Child tables (shareholders, operational_sites, managers, participations, intents, investment_projects)
 
 All child tables inherit access through the parent `subjects` row:
 
-| Policy        | Operation | Rule                                                                           |
-| ------------- | --------- | ------------------------------------------------------------------------------ |
-| Owner         | ALL       | `subject_id IN (SELECT id FROM subjects WHERE owner_profile_id = auth.uid())`  |
-| Agency member | ALL       | `subject_id IN (SELECT id FROM subjects WHERE agency_id = get_my_agency_id())` |
-| Internal      | ALL       | `is_internal()`                                                                |
-
-### `subject_openapi_cache`
-
-| Policy         | Operation | Rule            |
-| -------------- | --------- | --------------- |
-| Internal reads | SELECT    | `is_internal()` |
+| Policy             | Operation | Rule                                                                        |
+| ------------------ | --------- | --------------------------------------------------------------------------- |
+| Tenant seat holder | ALL       | `subject_id IN (SELECT id FROM subjects WHERE is_tenant_member(tenant_id))` |
+| Internal           | ALL       | `is_internal()`                                                             |
 
 **Notes:**
 
-- Customers and agency members can CRUD their own subjects and all child records.
-- `subject_openapi_cache` is internal-only (contains raw API data, cost info).
-- Agency viewers (`org_role = 'viewer'`) can SELECT but not modify.
+- Tenant seat holders (`seat_role IN ('owner', 'operator')`) can CRUD their tenant's subjects and all child records — this includes the profile's own personal tenant, so a solo customer manages their subjects the same way a firm's staff manage theirs.
+- `companies.payload` / `payload_meta` / `fetched_at` are internal-only (contains raw provider data, cost info) — expose `companies` to tenants only through a column-restricted view.
+- Tenant viewers (`seat_role = 'viewer'`) can SELECT but not modify.
 
 ---
 
 ## 5. Entity Relationship
 
 ```
-profiles (owner_profile_id)
+┌──────────────────────┐
+│      companies       │
+│ company_name, vat_code│
+│ tax_code             │
+│ payload, payload_meta│
+│ fetched_at           │
+└──────────┬───────────┘
+           │ 1:N (company_id)
+           ▼
+tenants (personal or org — see auth-database-schema.md)
      │
      │ 1:N
      ▼
 ┌──────────────────────────────────────────────────────┐
 │                    subjects                            │
-│  id, subject_type, company_name, vat_code             │
-│  owner_profile_id ──► profiles                        │
-│  agency_id ──────────► agencies                       │
+│  id, subject_type, company_id ──► companies           │
+│  tenant_id ────────────► tenants                        │
 │  ateco_primary, registered_address, financials (jsonb)│
 └──────────────────────┬───────────────────────────────┘
                        │
@@ -558,19 +589,13 @@ profiles (owner_profile_id)
 │ target, pct │ │ type, target │ │ title, area, budget   │
 │ relationship│ │ status       │ │ start/end date        │
 └─────────────┘ └──────────────┘ └──────────────────────┘
-
-┌──────────────────────┐
-│ subject_openapi_cache│
-│ payload (jsonb)      │    1:1 with subjects
-│ fetched_at, expires  │
-└──────────────────────┘
 ```
 
 **External references:**
 
 - `subjects.ateco_division` / `ateco_section` / `ateco_version` → links to `ateco(code, version)` for display/search
 - `subject_grant_matches` (matching schema, see [matching-database-schema.md](matching-database-schema.md)) → FK to `subjects(id)` + `grants(id)`
-- `ateco_division_slugs.division_codes[]` → compared against `subjects.ateco_division` in matching
+- `companies.vat_code` is distinct from `vat_lookups.vat_code` (see [vat-lookups-database-schema.md](vat-lookups-database-schema.md)) — `vat_lookups` is the acquisition-funnel/OpenAPI cache, `companies` is the shared identity registry linked from `subjects.company_id`. The claim flow should find-or-create the `companies` row by `vat_code` before attaching/creating the `subjects` row.
 
 ---
 
@@ -589,31 +614,32 @@ profiles (owner_profile_id)
 
 ### `subjects` column changes
 
-| Current columns (flat)                                                                                                                                                                                                                                                                                                                                                        | New representation           | Notes                                                                                                   |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `organization_id`                                                                                                                                                                                                                                                                                                                                                             | `agency_id`                  | Rename FK (now → `agencies(id)`)                                                                        |
-| `managed_by`                                                                                                                                                                                                                                                                                                                                                                  | —                            | DROP (agency-level management is via `agency_members`, not a per-subject column)                        |
-| `is_mock`, `label`, `company_description`                                                                                                                                                                                                                                                                                                                                     | —                            | DROP (dev/debug columns not needed in redesign)                                                         |
-| `legal_form_code`, `legal_form_description`, `legal_form_bando_enum`                                                                                                                                                                                                                                                                                                          | `legal_form` jsonb           | Collapse into `{code, description, bando_enum}`                                                         |
-| `ateco_primary_code`, `ateco_primary_description`                                                                                                                                                                                                                                                                                                                             | `ateco_primary` jsonb        | Collapse into `{code, description}`                                                                     |
-| `ateco_2022_primary_code`, `ateco_2022_primary_description`                                                                                                                                                                                                                                                                                                                   | —                            | DROP (old version codes — stored in `ateco` table with `version='2022'`, derivable via crosswalk)       |
-| `ateco_secondary_codes[]`                                                                                                                                                                                                                                                                                                                                                     | `ateco_secondary` jsonb[]    | Restructure to `[{code, description}]`                                                                  |
-| `ateco_2025_division_code`                                                                                                                                                                                                                                                                                                                                                    | `ateco_division`             | Rename                                                                                                  |
-| `ateco_2025_sezione_code`                                                                                                                                                                                                                                                                                                                                                     | `ateco_section`              | Rename                                                                                                  |
-| `ateco_2025_secondary_codes[]`, `ateco_2025_secondary_divisions[]`                                                                                                                                                                                                                                                                                                            | —                            | DROP (redundant with `ateco_secondary` + derivable division codes)                                      |
-| —                                                                                                                                                                                                                                                                                                                                                                             | `ateco_version`              | NEW: single source of truth for which ATECO version all codes belong to                                 |
-| `sede_legale_street`, `sede_legale_town`, `sede_legale_zip_code`, `sede_legale_province_code`, `sede_legale_province_name`, `sede_legale_region_code`, `sede_legale_region_name`                                                                                                                                                                                              | `registered_address` jsonb   | Collapse 7 columns into `{street, town, zip_code, province_code, region_code}` — names derived via JOIN |
-| `enterprise_size_code`, `enterprise_size_description`, `enterprise_size_bando_enum`                                                                                                                                                                                                                                                                                           | `enterprise_size` jsonb      | Collapse into `{code, description, bando_enum}`                                                         |
-| `balance_sheet_date`, `share_capital`, `net_worth`, `ebit`, `ebitda`, `cash_flow`, `ebitda_margin_pct`, `roe_pct`, `ros_pct`, `roa_pct`, `turnover_trend_pct`, `turnover_range_code`, `turnover_range_description`, `rae_code`, `rae_description`, `sae_code`, `sae_description`, `public_tenders`, `corporate_group`                                                         | `financials` jsonb           | Collapse ~19 flat columns into single jsonb                                                             |
-| `is_innovative_startup`, `is_innovative_sme`, `is_artisan`, `artisan_registration_date`, `is_impresa_sociale`, `is_stp`, `ri_section_agricole`, `ri_section_piccoli_imprenditori`, `is_registered_runts`, `runts_section`, `is_in_liquidation`, `has_soa_certification`, `belongs_to_corporate_group`, `is_exporter`, `is_importer`, `number_of_branches`, `is_iscritto_albo` | `registry_flags` jsonb       | Collapse ~17 boolean/flag columns into single jsonb                                                     |
-| `profession_type`, `professional_register` + `professional_profile` (already jsonb)                                                                                                                                                                                                                                                                                           | `professional_profile` jsonb | Merge the two flat columns into the existing jsonb structure                                            |
-| `planned_activity_description`, `planned_employee_count_range`, `planned_initial_capital`, `planned_legal_form`, `planned_opening_timeframe` + `business_project_profile`, `intended_company_form`                                                                                                                                                                            | `planned_business` jsonb     | Collapse aspiring-entrepreneur flat columns into single jsonb                                           |
-| `pec`, `email`, `phone`, `fax`, `website`                                                                                                                                                                                                                                                                                                                                     | `contacts` jsonb             | Collapse 5 contact columns into `{pec, email, phone, website}`; drop `fax`                              |
-| `special_geographies`                                                                                                                                                                                                                                                                                                                                                         | —                            | DROP (unused in matching, never populated consistently)                                                 |
-| `has_social`                                                                                                                                                                                                                                                                                                                                                                  | —                            | DROP (never used in matching, unclear semantics)                                                        |
-| `is_interested_in_opening_new_headquarter_province`, `is_interested_in_opening_new_headquarter_region`                                                                                                                                                                                                                                                                        | —                            | DROP (modeled via `subject_intents` instead)                                                            |
-| `owner_is_disoccupato`, `owner_has_degree`, `solution_targets_pa`                                                                                                                                                                                                                                                                                                             | —                            | DROP flat from subjects (moved into match-criteria context where relevant)                              |
-| `employee_range_code`                                                                                                                                                                                                                                                                                                                                                         | —                            | DROP (derivable from `employee_count` + `enterprise_size`)                                              |
+| Current columns (flat)                                                                                                                                                                                                                                                                                                                                                        | New representation              | Notes                                                                                                                                                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `company_name`, `vat_code`, `tax_code`                                                                                                                                                                                                                                                                                                                                        | `company_id` (FK → `companies`) | Extracted into new shared `companies` table so multiple subjects can reuse the same company identity. `UNIQUE(vat_code)` moved from `subjects` to `companies` |
+| `organization_id`                                                                                                                                                                                                                                                                                                                                                             | `tenant_id`                     | Rename FK (now → `tenants(id)`, 2nd generation was `agency_id`)                                                                                               |
+| `managed_by`                                                                                                                                                                                                                                                                                                                                                                  | —                               | DROP (tenant-level management is via `seats`, not a per-subject column)                                                                                       |
+| `is_mock`, `label`, `company_description`                                                                                                                                                                                                                                                                                                                                     | —                               | DROP (dev/debug columns not needed in redesign)                                                                                                               |
+| `legal_form_code`, `legal_form_description`, `legal_form_bando_enum`                                                                                                                                                                                                                                                                                                          | `legal_form` jsonb              | Collapse into `{code, description, bando_enum}`                                                                                                               |
+| `ateco_primary_code`, `ateco_primary_description`                                                                                                                                                                                                                                                                                                                             | `ateco_primary` jsonb           | Collapse into `{code, description}`                                                                                                                           |
+| `ateco_2022_primary_code`, `ateco_2022_primary_description`                                                                                                                                                                                                                                                                                                                   | —                               | DROP (old version codes — stored in `ateco` table with `version='2022'`, derivable via crosswalk)                                                             |
+| `ateco_secondary_codes[]`                                                                                                                                                                                                                                                                                                                                                     | `ateco_secondary` jsonb[]       | Restructure to `[{code, description}]`                                                                                                                        |
+| `ateco_2025_division_code`                                                                                                                                                                                                                                                                                                                                                    | `ateco_division`                | Rename                                                                                                                                                        |
+| `ateco_2025_sezione_code`                                                                                                                                                                                                                                                                                                                                                     | `ateco_section`                 | Rename                                                                                                                                                        |
+| `ateco_2025_secondary_codes[]`, `ateco_2025_secondary_divisions[]`                                                                                                                                                                                                                                                                                                            | —                               | DROP (redundant with `ateco_secondary` + derivable division codes)                                                                                            |
+| —                                                                                                                                                                                                                                                                                                                                                                             | `ateco_version`                 | NEW: single source of truth for which ATECO version all codes belong to                                                                                       |
+| `sede_legale_street`, `sede_legale_town`, `sede_legale_zip_code`, `sede_legale_province_code`, `sede_legale_province_name`, `sede_legale_region_code`, `sede_legale_region_name`                                                                                                                                                                                              | `registered_address` jsonb      | Collapse 7 columns into `{street, town, zip_code, province_code, region_code}` — names derived via JOIN                                                       |
+| `enterprise_size_code`, `enterprise_size_description`, `enterprise_size_bando_enum`                                                                                                                                                                                                                                                                                           | `enterprise_size` jsonb         | Collapse into `{code, description, bando_enum}`                                                                                                               |
+| `balance_sheet_date`, `share_capital`, `net_worth`, `ebit`, `ebitda`, `cash_flow`, `ebitda_margin_pct`, `roe_pct`, `ros_pct`, `roa_pct`, `turnover_trend_pct`, `turnover_range_code`, `turnover_range_description`, `rae_code`, `rae_description`, `sae_code`, `sae_description`, `public_tenders`, `corporate_group`                                                         | `financials` jsonb              | Collapse ~19 flat columns into single jsonb                                                                                                                   |
+| `is_innovative_startup`, `is_innovative_sme`, `is_artisan`, `artisan_registration_date`, `is_impresa_sociale`, `is_stp`, `ri_section_agricole`, `ri_section_piccoli_imprenditori`, `is_registered_runts`, `runts_section`, `is_in_liquidation`, `has_soa_certification`, `belongs_to_corporate_group`, `is_exporter`, `is_importer`, `number_of_branches`, `is_iscritto_albo` | `registry_flags` jsonb          | Collapse ~17 boolean/flag columns into single jsonb                                                                                                           |
+| `profession_type`, `professional_register` + `professional_profile` (already jsonb)                                                                                                                                                                                                                                                                                           | `professional_profile` jsonb    | Merge the two flat columns into the existing jsonb structure                                                                                                  |
+| `planned_activity_description`, `planned_employee_count_range`, `planned_initial_capital`, `planned_legal_form`, `planned_opening_timeframe` + `business_project_profile`, `intended_company_form`                                                                                                                                                                            | `planned_business` jsonb        | Collapse aspiring-entrepreneur flat columns into single jsonb                                                                                                 |
+| `pec`, `email`, `phone`, `fax`, `website`                                                                                                                                                                                                                                                                                                                                     | `contacts` jsonb                | Collapse 5 contact columns into `{pec, email, phone, website}`; drop `fax`                                                                                    |
+| `special_geographies`                                                                                                                                                                                                                                                                                                                                                         | —                               | DROP (unused in matching, never populated consistently)                                                                                                       |
+| `has_social`                                                                                                                                                                                                                                                                                                                                                                  | —                               | DROP (never used in matching, unclear semantics)                                                                                                              |
+| `is_interested_in_opening_new_headquarter_province`, `is_interested_in_opening_new_headquarter_region`                                                                                                                                                                                                                                                                        | —                               | DROP (modeled via `subject_intents` instead)                                                                                                                  |
+| `owner_is_disoccupato`, `owner_has_degree`, `solution_targets_pa`                                                                                                                                                                                                                                                                                                             | —                               | DROP flat from subjects (moved into match-criteria context where relevant)                                                                                    |
+| `employee_range_code`                                                                                                                                                                                                                                                                                                                                                         | —                               | DROP (derivable from `employee_count` + `enterprise_size`)                                                                                                    |
 
 ### `subject_shareholders` column changes
 
@@ -668,11 +694,14 @@ profiles (owner_profile_id)
 | `timeframe_start`   | `start_date` | Rename                                          |
 | `timeframe_end`     | `end_date`   | Rename                                          |
 
-### `subject_openapi_raw` → `subject_openapi_cache` column changes
+### `subject_openapi_raw` → merged into `companies`
 
-| Current column   | New column | Notes                                           |
-| ---------------- | ---------- | ----------------------------------------------- |
-| table name       | rename     | `subject_openapi_raw` → `subject_openapi_cache` |
-| `openapi_tier`   | `api_tier` | Rename                                          |
-| `fetch_cost_eur` | `cost_eur` | Rename                                          |
-| `created_at`     | —          | DROP (redundant with `fetched_at`)              |
+| Current column                                                 | New column             | Notes                                                                                                            |
+| -------------------------------------------------------------- | ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| table name                                                     | merge into `companies` | `subject_openapi_raw` (per-subject) dropped; cache now lives on `companies` keyed by VAT, shared across subjects |
+| `subject_id`                                                   | —                      | DROP (cache no longer per-subject; `companies.vat_code` is the key)                                              |
+| `payload`                                                      | `payload`              | Move to `companies`, unchanged                                                                                   |
+| `openapi_tier`, `payload_hash`, `fetch_cost_eur`, `expires_at` | `payload_meta` jsonb   | Collapse into a single `{tier, payload_hash, cost_eur, expires_at}` jsonb on `companies`                         |
+| `vat_code`                                                     | —                      | DROP (redundant — same as `companies.vat_code`)                                                                  |
+| `fetched_at`                                                   | `fetched_at`           | Move to `companies`, unchanged                                                                                   |
+| `created_at`                                                   | —                      | DROP (redundant with `fetched_at`)                                                                               |

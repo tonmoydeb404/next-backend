@@ -98,7 +98,7 @@ One row per recipient per send — previously not tracked at all (only an aggreg
 
 **Notes:**
 
-- Internal-only editorial tables — never exposed publicly or to agencies.
+- Internal-only editorial tables — never exposed publicly or to tenants.
 - A recipient never needs to read their own `newsletter_recipients` row (delivery status isn't shown to end-users), so no self-select policy is needed.
 
 ---

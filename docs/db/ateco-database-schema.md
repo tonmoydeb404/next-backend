@@ -11,7 +11,6 @@
 1. [Tables](#1-tables)
    - [ateco](#ateco)
    - [ateco_crosswalk](#ateco_crosswalk)
-   - [ateco_division_slugs](#ateco_division_slugs)
 2. [RLS Policies](#2-rls-policies)
 3. [Entity Relationship](#3-entity-relationship)
 4. [Seeding](#4-seeding)
@@ -86,27 +85,6 @@ Maps codes between ATECO versions. Used to upgrade bandi/subjects from an old ve
 
 ---
 
-### `ateco_division_slugs`
-
-Maps human-readable subsector slugs (from bando eligibility criteria) to 2-digit ATECO division codes. Bridges textual sector labels to numeric codes for the matching engine. Always references the **current** ATECO version.
-
-| Column           | Type    | Nullable | Default | Description                                                 |
-| ---------------- | ------- | -------- | ------- | ----------------------------------------------------------- |
-| `slug`           | text    | NO       | —       | PK — subsector slug (e.g. `"costruzioni"`, `"agricoltura"`) |
-| `division_codes` | text[]  | NO       | —       | 2-digit ATECO division codes covered by this slug           |
-| `label`          | text    | YES      | —       | Human-readable label                                        |
-| `section_code`   | char(1) | YES      | —       | ATECO section letter (A–V)                                  |
-| `section_slug`   | text    | YES      | —       | Section-level slug for grouping                             |
-
-**Notes:**
-
-- Populated by the match-criteria script from bandi extraction data.
-- `section_code` and `section_slug` are backfilled from `ateco` (current version) based on the first division code.
-- Used in matching: bando eligibility specifies `ateco_included` slugs → this table resolves them to division codes → compared against subject's ATECO division.
-- When a new ATECO version is adopted, this table is reseeded with updated division codes.
-
----
-
 ## 2. RLS Policies
 
 ### `ateco`
@@ -121,17 +99,10 @@ Maps human-readable subsector slugs (from bando eligibility criteria) to 2-digit
 | ----------- | --------- | ---------------------- |
 | Public read | SELECT    | `true` (any auth role) |
 
-### `ateco_division_slugs`
-
-| Policy             | Operation | Rule                            |
-| ------------------ | --------- | ------------------------------- |
-| Authenticated read | SELECT    | `auth.role() = 'authenticated'` |
-
 **Notes:**
 
 - No INSERT/UPDATE/DELETE policies — all writes are via `service_role` scripts.
 - `ateco` and `ateco_crosswalk` are public reference data.
-- `ateco_division_slugs` is restricted to authenticated users (matching context only).
 
 ---
 
@@ -157,33 +128,23 @@ Maps human-readable subsector slugs (from bando eligibility criteria) to 2-digit
 │  to_code, to_version             │    Version migration mapping
 │  coverage (TOTAL/PARTIAL)        │
 └──────────────────────────────────┘
-
-┌──────────────────────────────────┐
-│    ateco_division_slugs          │
-│  slug (PK)                       │
-│  division_codes[] ───────────────┼──► 2-digit codes (current version)
-│  section_code, label             │
-│                                  │    Bridges bando eligibility → ATECO
-└──────────────────────────────────┘
 ```
 
 **External references (from other schema groups):**
 
 - `subjects` stores `ateco_code` + `ateco_version` for sector-based matching
 - `grants` / `grant_match_criteria` stores `ateco_code` + `ateco_version` for eligibility
-- `grant_match_criteria.ateco_included` — array of slugs that resolve via `ateco_division_slugs`
 
 ---
 
 ## 4. Seeding
 
-| Table                  | Source                                         | Script                        | Rows per version |
-| ---------------------- | ---------------------------------------------- | ----------------------------- | ---------------- |
-| `ateco`                | ISTAT official taxonomy (full tree)            | `seed-ateco.mjs`              | ~3257            |
-| `ateco_crosswalk`      | ISTAT bidirectional correspondence spreadsheet | `seed-ateco-crosswalk.mjs`    | ~6682            |
-| `ateco_division_slugs` | Derived from bandi extraction data             | `populate-match-criteria.mjs` | varies           |
+| Table             | Source                                         | Script                     | Rows per version |
+| ----------------- | ---------------------------------------------- | -------------------------- | ---------------- |
+| `ateco`           | ISTAT official taxonomy (full tree)            | `seed-ateco.mjs`           | ~3257            |
+| `ateco_crosswalk` | ISTAT bidirectional correspondence spreadsheet | `seed-ateco-crosswalk.mjs` | ~6682            |
 
-**Seeding order:** `ateco` first → `ateco_crosswalk` second → `ateco_division_slugs` last.
+**Seeding order:** `ateco` first → `ateco_crosswalk` second.
 
 **Initial seed:** `ateco` with versions `"2022"` and `"2025"`, crosswalk with `from_version = "2022"`, `to_version = "2025"`.
 
@@ -201,17 +162,14 @@ When a new ATECO version is published (e.g. 2030):
 2. Seed crosswalk
    → INSERT INTO ateco_crosswalk (from_version = '2025', to_version = '2030', ...)
 
-3. Reseed ateco_division_slugs
-   → Update division_codes to use 2030 codes
-
-4. Upgrade existing records (optional, per-record)
+3. Upgrade existing records (optional, per-record)
    → For each bando/subject still on version '2025':
      → Look up crosswalk: from_code = current code, from_version = '2025', to_version = '2030'
      → If coverage = 'TOTAL': auto-upgrade
      → If coverage = 'PARTIAL': flag for manual review
      → UPDATE SET ateco_code = new_code, ateco_version = '2030'
 
-5. New bandi/subjects default to the latest version
+4. New bandi/subjects default to the latest version
 ```
 
 ---
@@ -220,11 +178,10 @@ When a new ATECO version is published (e.g. 2030):
 
 ### Table renames
 
-| Current                | New                    | Notes                                                       |
-| ---------------------- | ---------------------- | ----------------------------------------------------------- |
-| `ateco_2025`           | `ateco`                | Version-agnostic; add `version` column to form composite PK |
-| `ateco_2025_2022_map`  | `ateco_crosswalk`      | Version-agnostic naming                                     |
-| `ateco_division_slugs` | `ateco_division_slugs` | Unchanged name                                              |
+| Current               | New               | Notes                                                       |
+| --------------------- | ----------------- | ----------------------------------------------------------- |
+| `ateco_2025`          | `ateco`           | Version-agnostic; add `version` column to form composite PK |
+| `ateco_2025_2022_map` | `ateco_crosswalk` | Version-agnostic naming                                     |
 
 ### `ateco_2025` → `ateco` column changes
 
@@ -253,9 +210,3 @@ When a new ATECO version is published (e.g. 2030):
 | `titolo_2022`    | —              | DROP (titles live in `ateco` itself, JOIN to get them)             |
 | `titolo_2025`    | —              | DROP (same)                                                        |
 | —                | `coverage`     | NEW: `TOTAL` or `PARTIAL` (derived from the old copertura columns) |
-
-### `ateco_division_slugs` column changes
-
-| Current column | New column     | Notes  |
-| -------------- | -------------- | ------ |
-| `slug_sezione` | `section_slug` | Rename |

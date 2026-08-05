@@ -100,7 +100,7 @@ Italy's ~107 provinces (including metropolitan cities). Immutable reference data
 - `subjects.registered_address` (jsonb) → stores `province_code` only
 - `subject_operational_sites` → stores `province_code`, `region_code`
 - `subject_intents.target` (jsonb, geographic intents) → stores `province_code`, `region_code`
-- `agencies.address` (jsonb) → stores `province_code`, `region_code`
+- `tenants.address` (jsonb) → stores `province_code`, `region_code`
 - `grant_match_criteria` (geographic eligibility) → stores region/province codes for matching, see [matching-database-schema.md](matching-database-schema.md)
 
 **Pattern:** every table that needs a location stores only `province_code` and/or `region_code`. Names are resolved via JOIN (backend) or a small cached client-side map (frontend — ~127 rows total, safe to load once).
@@ -167,4 +167,4 @@ Once `regions`/`provinces` exist, all tables that currently store `*_region_name
 
 - `subjects`: `sede_legale_region_code`, `sede_legale_region_name`, `sede_legale_province_code`, `sede_legale_province_name` → becomes `registered_address.province_code` jsonb (name from JOIN)
 - `subject_operational_sites`: `region_code`, `region_name`, `province_code`, `province_name` → keeps codes only, drops name columns
-- `organizations` (→ `agencies`): `address_region_code`, `address_region_name`, `address_province_code`, `address_province_name` → becomes `address.province_code` jsonb (name from JOIN)
+- `organizations` (→ `tenants`): `address_region_code`, `address_region_name`, `address_province_code`, `address_province_name` → becomes `address.province_code` jsonb (name from JOIN)

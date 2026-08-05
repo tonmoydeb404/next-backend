@@ -3,7 +3,7 @@
 > **Engine:** PostgreSQL (Supabase)
 > **RLS:** Enabled on every table
 > **Language:** All table names, column names and values in English
-> **Depends on:** [auth-database-schema.md](auth-database-schema.md) (`profiles`, `agencies`, `is_internal()`, `get_my_agency_id()`)
+> **Depends on:** [auth-database-schema.md](auth-database-schema.md) (`profiles`, `tenants`, `is_internal()`, `is_tenant_member()`)
 > **Referenced by:** [bandi-database-schema.md](bandi-database-schema.md) (`grant_assets` junction)
 
 ---
@@ -34,7 +34,7 @@
 | Value            | Folder prefix      | Description                         |
 | ---------------- | ------------------ | ----------------------------------- |
 | `avatar`         | `avatars/`         | User profile pictures               |
-| `logo`           | `logos/`           | Agency logos (square and wide)      |
+| `logo`           | `logos/`           | Tenant logos (square and wide)      |
 | `grant_document` | `grant-documents/` | PDFs, source docs, attachments      |
 | `grant_image`    | `grant-images/`    | Cover images, thumbnails for grants |
 
@@ -93,15 +93,15 @@ Universal file metadata registry. Storage-provider-agnostic — `path` is a rela
 
 ### `assets`
 
-| Policy                | Operation | Rule                                                                                                                                              |
-| --------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public assets         | SELECT    | `visibility = 'public'`                                                                                                                           |
-| Internal sees all     | SELECT    | `is_internal()`                                                                                                                                   |
-| Own uploads           | SELECT    | `uploaded_by = auth.uid()`                                                                                                                        |
-| Own avatar            | SELECT    | `id = (SELECT avatar_id FROM profiles WHERE id = auth.uid())`                                                                                     |
-| Own agency logos      | SELECT    | `id IN (SELECT logo_square_id FROM agencies WHERE id = get_my_agency_id() UNION SELECT logo_wide_id FROM agencies WHERE id = get_my_agency_id())` |
-| Internal manages all  | ALL       | `is_internal()`                                                                                                                                   |
-| Authenticated uploads | INSERT    | `auth.role() = 'authenticated'`                                                                                                                   |
+| Policy                | Operation | Rule                                                                                                                                      |
+| --------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Public assets         | SELECT    | `visibility = 'public'`                                                                                                                   |
+| Internal sees all     | SELECT    | `is_internal()`                                                                                                                           |
+| Own uploads           | SELECT    | `uploaded_by = auth.uid()`                                                                                                                |
+| Own avatar            | SELECT    | `id = (SELECT avatar_id FROM profiles WHERE id = auth.uid())`                                                                             |
+| Own tenant logos      | SELECT    | `id IN (SELECT logo_square_id FROM tenants WHERE is_tenant_member(id) UNION SELECT logo_wide_id FROM tenants WHERE is_tenant_member(id))` |
+| Internal manages all  | ALL       | `is_internal()`                                                                                                                           |
+| Authenticated uploads | INSERT    | `auth.role() = 'authenticated'`                                                                                                           |
 
 **Notes:**
 
@@ -125,7 +125,7 @@ profiles (uploaded_by)           profiles (avatar_id)
         │ 1:1 FK
         ▼
 ┌──────────────┐
-│   agencies    │
+│   tenants     │
 │ logo_square_id│
 │ logo_wide_id  │
 └──────────────┘
@@ -215,7 +215,7 @@ function getAssetUrl(asset: Asset): string {
 ### Impact on other schemas
 
 - **bandi-database-schema.md**: Drop `grant_documents` table and `source_document_id` FK from `grants`. Add note that grant files are managed via `grant_assets` in this schema.
-- **auth-database-schema.md**: Add `avatar_id` FK on `profiles`, `logo_square_id`/`logo_wide_id` FKs on `agencies`.
+- **auth-database-schema.md**: Add `avatar_id` FK on `profiles`, `logo_square_id`/`logo_wide_id` FKs on `tenants`.
 - **ai-chat (planned)**: `gemini_files.grant_document_id` → `gemini_files.asset_id` FK to `assets(id)`.
 
 ### Enum mapping for `doc_type` → `grant_asset_role`

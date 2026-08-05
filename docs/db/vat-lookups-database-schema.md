@@ -150,7 +150,7 @@ openapi_fetch_log
   subject_id ─────────────► subjects
 ```
 
-`public_lookup_vat(p_piva, ...)` is the anonymous entry point: validates the VAT code, dedupes against `vat_lookups.vat_code`, calls OpenAPI **IT-full** only on first sight (cached forever after in `payload`), logs every attempt to `openapi_fetch_log`, and enforces a daily + per-IP fetch cap. `claim_vat_lookup(p_piva)` (verified, authenticated users only) then attaches a stored lookup to the calling account, creating/reusing the matching `subjects` row.
+`public_lookup_vat(p_piva, ...)` is the anonymous entry point: validates the VAT code, dedupes against `vat_lookups.vat_code`, calls OpenAPI **IT-full** only on first sight (cached forever after in `payload`), logs every attempt to `openapi_fetch_log`, and enforces a daily + per-IP fetch cap. `claim_vat_lookup(p_piva)` (verified, authenticated users only) then finds-or-creates a `companies` row by `vat_code` (see [subjects-database-schema.md](subjects-database-schema.md#companies)) and attaches a stored lookup to the calling account, creating/reusing the matching `subjects` row with `company_id` set.
 
 ---
 
@@ -175,7 +175,7 @@ Both tables keep their current names — no renames needed.
 
 ### RLS policy note
 
-The current production RLS policy uses `is_bandinet()` (checks org membership in the BandiNet organization row). In the new auth model ([auth-database-schema.md](auth-database-schema.md)), this becomes `is_internal()` (checks `account_type = 'internal'`). The logic is equivalent — same set of people — but the function name and implementation change.
+The current production RLS policy uses `is_bandinet()` (checks org membership in the BandiNet organization row). In the new auth model ([auth-database-schema.md](auth-database-schema.md)), this becomes `is_internal()` (checks `internal_role_id IS NOT NULL` on `profiles`). The logic is equivalent — same set of people — but the function name and implementation change.
 
 ### Enum values
 
