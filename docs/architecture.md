@@ -47,6 +47,13 @@ object (`ENV`, `BACKEND.BASE_URL`), mirroring the Backend's pattern. `next.confi
 `NODE_ENV` — Next.js always forces `NODE_ENV=production` on `next build`/`next start`, so it can't
 distinguish deploy stages. Committed template: `example.env`; local values: gitignored `.env.local`.
 
+**Dark mode:** `next-themes` (`src/components/theme-provider.tsx` wraps `ThemeProvider`, mounted in
+`layout.tsx`; `src/components/mode-toggle.tsx` toggles + a global "d" keyboard shortcut).
+
+**Showcase dashboard (`src/app/page.tsx`):** example bento-grid page calling the Backend API via
+`@repo/store` (`useHealthCheckQuery`, `useRegionsListQuery`, `useProvincesListQuery`) to render
+health/region/province status tiles — demonstrates the RTK Query wiring, not production UI.
+
 ### Website (`apps/website/`)
 
 Public-facing Next.js app serving two audiences via route groups:
@@ -72,6 +79,9 @@ Both share auth, components, and the same backend API. Differentiated by roles a
 
 **Env validation:** `src/config/env.config.ts` — same pattern as Publicator (Zod schema +
 `envConfig`), consumed by `next.config.ts` for the `BACKEND_BASE_URL` rewrite destination.
+
+**Dark mode & showcase dashboard:** same `next-themes` setup and example bento-grid `page.tsx` as
+Publicator (see above) — mirrored here as a shared reference implementation.
 
 ### Backend (`apps/backend/`)
 
