@@ -39,6 +39,14 @@ Internal admin dashboard for managing grants, users, and content.
 
 Never talks to Supabase directly for data — all data flows through the Backend API. Supabase Auth is used directly only for login/MFA, same pattern as Website.
 
+**Env validation:** `src/config/env.config.ts` — Zod schema + `validate()`, exported `envConfig`
+object (`ENV`, `BACKEND.BASE_URL`), mirroring the Backend's pattern. `next.config.ts` reads
+`envConfig.BACKEND.BASE_URL` (from `NEXT_PUBLIC_BACKEND_BASE_URL` env var) for the
+`/backend/api/**` rewrite destination — no raw `process.env` access elsewhere in the app.
+`envConfig.ENV` is derived from `NEXT_PUBLIC_APP_ENV` (`development`/`staging`/`production`), not
+`NODE_ENV` — Next.js always forces `NODE_ENV=production` on `next build`/`next start`, so it can't
+distinguish deploy stages. Committed template: `example.env`; local values: gitignored `.env.local`.
+
 ### Website (`apps/website/`)
 
 Public-facing Next.js app serving two audiences via route groups:
@@ -61,6 +69,9 @@ app/
 **Studio** = tenants (consulting firms) managing multiple client subjects.
 
 Both share auth, components, and the same backend API. Differentiated by roles and middleware-gated routes.
+
+**Env validation:** `src/config/env.config.ts` — same pattern as Publicator (Zod schema +
+`envConfig`), consumed by `next.config.ts` for the `BACKEND_BASE_URL` rewrite destination.
 
 ### Backend (`apps/backend/`)
 
