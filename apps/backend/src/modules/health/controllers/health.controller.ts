@@ -1,9 +1,9 @@
 import { Controller, Get, VERSION_NEUTRAL } from '@nestjs/common';
-import { ApiExcludeController } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
-import { DrizzleHealthIndicator } from './drizzle.health-indicator';
+import { DrizzleHealthIndicator } from '../services/drizzle.health-indicator';
 
-@ApiExcludeController()
+@ApiTags('Health')
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
   constructor(

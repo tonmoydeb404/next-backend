@@ -1,0 +1,26 @@
+{
+  "name": "@repo/store",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "imports": {
+    "#*": "./src/*"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.11.2",
+    "@repo/validators": "workspace:*",
+    "react-redux": "^9.2.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:^",
+    "@types/node": "^26.1.2",
+    "typescript": "5.9.2"
+  }
+}

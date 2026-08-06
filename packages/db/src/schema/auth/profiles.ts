@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
-import { internalRoles } from "./internal-roles.js";
-import { tenants } from "./tenants.js";
+import { internalRoles } from "./internal-roles.ts";
+import { tenants } from "./tenants.ts";
 
 /**
  * Universal identity table, 1:1 with `auth.users`. Internal staff vs. customer is discriminated

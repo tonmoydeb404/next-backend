@@ -1,7 +1,11 @@
 {
   "extends": "@repo/typescript-config/base.json",
   "compilerOptions": {
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src",
+    // this package is only ever type-checked (no build script), so disable the emit-only rewrite
+    "noEmit": true,
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src"]
 }

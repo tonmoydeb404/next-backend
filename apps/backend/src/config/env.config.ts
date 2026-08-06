@@ -4,6 +4,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(['development', 'production', 'test'])
     .default('development'),
+  HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.url(),
   DIRECT_URL: z.url(),
@@ -44,6 +45,7 @@ export const envConfigFn = () => {
       TEST: env.NODE_ENV === 'test',
     },
     APP: {
+      HOST: env.HOST,
       PORT: env.PORT,
       CORS_ORIGINS: env.CORS_ORIGINS,
     },
@@ -57,7 +59,5 @@ export const envConfigFn = () => {
     },
   };
 };
-
-export const envConfig = envConfigFn();
 
 export type EnvConfig = ReturnType<typeof envConfigFn>;

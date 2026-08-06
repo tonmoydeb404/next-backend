@@ -6,9 +6,9 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { profiles } from "./profiles.js";
-import { seatRole } from "./seat-role.js";
-import { tenants } from "./tenants.js";
+import { profiles } from "./profiles.ts";
+import { seatRole } from "./seat-role.ts";
+import { tenants } from "./tenants.ts";
 
 /**
  * Tenant membership rows. A seat starts vacant (profileId null) and is assigned to a customer

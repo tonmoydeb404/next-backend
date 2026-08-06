@@ -1,15 +1,21 @@
+import { AppModule } from '@/app/app.module';
 import type { EnvConfig } from '@/config/env.config';
-import { AppModule } from '@/modules/app/app.module';
 import { VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { apiReference } from '@scalar/nestjs-api-reference';
+import { setupGracefulShutdown } from '@tygra/nestjs-graceful-shutdown';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService<EnvConfig, true>);
+  setupGracefulShutdown({ app });
+
+  app.useStaticAssets(join(__dirname, '..', 'public'));
 
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
@@ -25,6 +31,13 @@ async function bootstrap() {
   );
   app.use('/reference', apiReference({ content: document }));
 
-  await app.listen(config.get('APP.PORT', { infer: true }));
+  const PORT = config.get('APP.PORT', { infer: true });
+  const HOST = config.get('APP.HOST', { infer: true });
+
+  await app.listen(PORT, HOST, () => {
+    const url = `http://${HOST}:${PORT}`;
+    console.log(`🚀 Server is running on ${url}`);
+    console.log(`📖 API Reference: ${url}/reference`);
+  });
 }
 void bootstrap();

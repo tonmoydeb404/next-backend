@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
-import { DrizzleHealthIndicator } from './drizzle.health-indicator';
-import { HealthController } from './health.controller';
+import { HealthController } from './controllers';
+import { DrizzleHealthIndicator } from './services';
 
 @Module({
   imports: [TerminusModule],

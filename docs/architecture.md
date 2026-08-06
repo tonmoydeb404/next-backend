@@ -92,9 +92,12 @@ No Supabase Edge Functions unless strictly required.
 - Path aliases: `@/*` → `./src/*` (via `tsconfig.json` `paths`), rewritten to relative paths in
   `dist/` at build time by `tsc-alias` (`nest build && tsc-alias -p tsconfig.build.json`)
 - Structure: `src/modules/{domain}/` per feature (e.g. `modules/app`, `modules/health`), each with
-  its own controller/service/module files; `src/database/` holds the Drizzle client wiring and a
-  `repositories/` folder (one `{entity}.repository.ts` per table, injected into services — no
-  service should inject the Drizzle client directly)
+  `controllers/`, `services/`, and `dto/` folders. Once a module covers more than one resource, its
+  `dto/` folder splits into one subfolder per resource (e.g. `modules/geography/dto/{region,
+province}/`, mirroring `@repo/validators`'s `api/<domain>/<resource>/` layout), each with its own
+  barrel `index.ts` re-exported from the module-level `dto/index.ts`; `src/database/` holds the
+  Drizzle client wiring and a `repositories/` folder (one `{entity}.repository.ts` per table,
+  injected into services — no service should inject the Drizzle client directly)
 - Validation/serialization: `nestjs-zod` (`ZodValidationPipe` + `ZodSerializerInterceptor`,
   registered globally in `AppModule`)
 - Env validation: `@nestjs/config` with a Zod schema (`src/config/env.validation.ts`) as the
@@ -134,9 +137,32 @@ Zod schemas for runtime validation. Lightweight, frontend-safe. Package name is 
 - **Consumer:** All apps (backend, publicator, website) — currently linked from the backend only;
   add as a dependency to publicator/website when a form or API call needs to share a schema
 - **Constraint:** Zero backend dependencies — no Drizzle, no Node-only packages
-- **Contains:** Zod schemas for API request/response payloads, form validation
-- **Status:** scaffolded with an Auth & Identity reference (`updateProfileSchema`,
-  `inviteSeatSchema`) matching `packages/db`'s reference domain. Other domains added as needed.
+- **Structure:** `src/db/<domain>/<entity>.ts` — schemas mirroring `packages/db` tables 1:1 (e.g.
+  `db/auth/profile.ts`, `db/geography/region.ts`); `src/api/<domain>/<resource>/<file>.ts` —
+  request/response schemas per endpoint, grouped by resource, often built by `.omit()`/`.extend()`
+  off the matching `db` schema, using the fixed filenames `<resource>-details.ts` (single-item
+  response, wraps the `db` schema in `buildResponseSchema` — e.g. `regionDetailsResponseSchema`),
+  `<resource>-list.ts` (collection response, wraps `<entity>Schema.array()` in
+  `buildResponseSchema` — e.g. `regionListResponseSchema`), and `<resource>-common.ts` (params/
+  query schemas shared by that resource's endpoints — e.g. `region-common.ts` holds
+  `regionCodeParamSchema`, `province-common.ts` holds `provinceCodeParamSchema` +
+  `listProvincesQuerySchema`; no separate `*-code-param.ts`/`*-query.ts` files); other operations
+  (e.g. `profile-update.ts`) get their own descriptively-named file. `src/common/response.ts` —
+  the shared response envelope (`buildResponseSchema`, `buildPaginatedResponseSchema`,
+  `formatResponse`, `formatErrorResponse`, `serializePagination`, etc.), framework-agnostic (no
+  `createZodDto`/`nestjs-zod`) — the response _schema_ (envelope + data) is built once in
+  validators' `api/<domain>/<resource>/<resource>-details.ts`/`-list.ts`; backend `dto/*.ts` files
+  only import that pre-built schema and wrap it with `createZodDto` where a NestJS DTO class is
+  needed (no `buildResponseSchema` calls in backend). Each folder has a barrel `index.ts`; the
+  package root re-exports `db`, `api`, and `common` flat, so consumer imports
+  (`import { regionSchema } from '@repo/validators'`) don't need to change when files move.
+  Backend `modules/<domain>/dto/<resource>/` mirrors the same `<resource>-details.dto.ts`,
+  `<resource>-list.dto.ts`, `<resource>-common.dto.ts` filenames.
+- **Status:** scaffolded with Geography (`regionSchema`, `provinceSchema` + params) as the
+  reference domain, matching `packages/db`'s Geography schema. Auth & Identity validators
+  (`profileSchema`, `updateProfileSchema`, `inviteSeatSchema`, `internalRoleSchema`) were removed
+  (2026-08-06) — no backend Auth module/API exists yet to consume them; re-add following the same
+  `db/` + `api/` split once that module is built. Other domains added as needed.
 
 ### `packages/shared`
 

@@ -1,3 +1,4 @@
+import type { Config } from "drizzle-kit";
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
@@ -7,4 +8,4 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DIRECT_URL!,
   },
-});
+}) satisfies Config;
