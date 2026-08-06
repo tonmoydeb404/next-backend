@@ -7,7 +7,6 @@ const envSchema = z.object({
   HOST: z.string().default('0.0.0.0'),
   PORT: z.coerce.number().int().positive().default(3000),
   DATABASE_URL: z.url(),
-  DIRECT_URL: z.url(),
   SUPABASE_URL: z.url(),
   SUPABASE_JWKS_URL: z.url(),
   CORS_ORIGINS: z
@@ -51,7 +50,6 @@ export const envConfigFn = () => {
     },
     DATABASE: {
       URL: env.DATABASE_URL,
-      DIRECT_URL: env.DIRECT_URL,
     },
     SUPABASE: {
       URL: env.SUPABASE_URL,

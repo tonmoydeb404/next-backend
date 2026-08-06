@@ -137,9 +137,11 @@ Package name is `@repo/db` (repo convention, matching `@repo/eslint-config`/`@re
 - **Consumer:** Backend only (never imported by frontend apps)
 - **Contains:** Drizzle table definitions (`postgres-js` driver), `drizzle.config.ts`, migrations
 - **Reference:** `docs/db/` folder holds human-readable schema docs
-- **Status:** scaffolded with the Auth & Identity domain (`profiles`, `internal_roles`, `tenants`,
-  `seats`) as the reference implementation. The other 8 domains (ATECO, geography, subjects,
-  grants, newsletter, matching, VAT lookups, assets) are not yet translated to Drizzle tables.
+- **Status:** scaffolded with the Geography domain (`regions`, `provinces`) as the reference
+  implementation. The Auth & Identity domain (`profiles`, `internal_roles`, `tenants`, `seats`)
+  was removed (2026-08-07) — no backend Auth module exists yet to consume it; re-add once that
+  module is built. The other 7 domains (ATECO, subjects, grants, newsletter, matching, VAT
+  lookups, assets) are not yet translated to Drizzle tables.
 
 ### `packages/validators`
 
