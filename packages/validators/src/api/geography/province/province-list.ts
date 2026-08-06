@@ -10,3 +10,4 @@ export type ProvinceListQuery = z.infer<typeof provinceListQuerySchema>;
 export const provinceListResponseSchema = buildResponseSchema(
   provinceSchema.array(),
 );
+export type ProvinceListResponse = z.infer<typeof provinceListResponseSchema>;

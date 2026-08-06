@@ -6,6 +6,6 @@ const baseUrl = "/backend/api/v1";
 export const Api = createApi({
   reducerPath: "api",
   baseQuery: fetchBaseQuery({ baseUrl }),
-  tagTypes: ["Region", "Province"],
+  tagTypes: ["Region", "Province", "Health"],
   endpoints: () => ({}),
 });

@@ -1,9 +1,14 @@
 import { Api } from "#base-api.ts";
 import {
   GEOGRAPHY_CACHE_KEYS,
+  GEOGRAPHY_PROVINCES_ENDPOINTS,
   GEOGRAPHY_REGIONS_ENDPOINTS,
 } from "#endpoints/geography/constant.ts";
 import type {
+  ProvinceCodeParam,
+  ProvinceDetailsResponse,
+  ProvinceListQuery,
+  ProvinceListResponse,
   RegionCodeParam,
   RegionDetailsResponse,
   RegionListResponse,
@@ -22,7 +27,26 @@ export const geographyApi = Api.injectEndpoints({
       query: (code) => GEOGRAPHY_REGIONS_ENDPOINTS.DETAILS(code),
       providesTags: [GEOGRAPHY_CACHE_KEYS.REGION_LIST],
     }),
+    provincesList: builder.query<ProvinceListResponse, ProvinceListQuery>({
+      query: (params) => ({
+        url: GEOGRAPHY_PROVINCES_ENDPOINTS.LIST,
+        params,
+      }),
+      providesTags: [GEOGRAPHY_CACHE_KEYS.PROVINCE_LIST],
+    }),
+    provinceDetails: builder.query<
+      ProvinceDetailsResponse,
+      ProvinceCodeParam["code"]
+    >({
+      query: (code) => GEOGRAPHY_PROVINCES_ENDPOINTS.DETAILS(code),
+      providesTags: [GEOGRAPHY_CACHE_KEYS.PROVINCE_LIST],
+    }),
   }),
 });
 
-export const { useRegionsListQuery, useRegionDetailsQuery } = geographyApi;
+export const {
+  useRegionsListQuery,
+  useRegionDetailsQuery,
+  useProvincesListQuery,
+  useProvinceDetailsQuery,
+} = geographyApi;

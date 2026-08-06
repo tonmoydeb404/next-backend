@@ -1,3 +1,4 @@
+import { ThemeProvider } from "@/components/theme-provider";
 import { cn } from "@/lib/utils";
 import { ReduxWrapper } from "@/store/wrapper";
 import type { Metadata } from "next";
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn(
         "h-full",
         "antialiased",
@@ -35,7 +37,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       )}
     >
       <body className="min-h-full flex flex-col">
-        <ReduxWrapper>{children}</ReduxWrapper>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ReduxWrapper>{children}</ReduxWrapper>
+        </ThemeProvider>
       </body>
     </html>
   );
