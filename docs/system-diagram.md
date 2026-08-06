@@ -40,9 +40,9 @@ graph TB
     end
 
     subgraph "Shared Packages"
-        PkgDB["@bandinet/db<br/><i>Drizzle schema</i>"]
-        PkgValidators["@bandinet/validators<br/><i>Zod schemas</i>"]
-        PkgShared["@bandinet/shared<br/><i>Types · Enums</i>"]
+        PkgDB["@repo/db<br/><i>Drizzle schema</i>"]
+        PkgValidators["@repo/validators<br/><i>Zod schemas</i>"]
+        PkgShared["@repo/shared<br/><i>Types · Enums</i>"]
     end
 
     %% Auth: Website handles all auth, calls Supabase directly

@@ -17,6 +17,7 @@
    - [grant_faq](#grant_faq)
    - [grant_tags](#grant_tags)
    - [grant_tag_assignments](#grant_tag_assignments)
+   - [grant_date_type_labels](#grant_date_type_labels)
    - [grant_assignments](#grant_assignments)
    - [grant_notes](#grant_notes)
    - [grant_suggestions](#grant_suggestions)
@@ -425,6 +426,29 @@ Join table: grants ↔ tags (M:N).
 
 ---
 
+### `grant_date_type_labels`
+
+Global lookup of configurable date-type slugs shown in the "Categorie date" settings page. Not FK-referenced from `grants.general_info.key_dates[].type` (that field lives inside jsonb) — the link is enforced at the application level only.
+
+| Column             | Type        | Nullable | Default             | Description                                          |
+| ------------------ | ----------- | -------- | -------------------- | ----------------------------------------------------- |
+| `id`                | uuid        | NO       | `gen_random_uuid()` | PK                                                     |
+| `label`             | text        | NO       | —                    | Display label (e.g. "1° SAL")                          |
+| `slug`              | text        | NO       | —                    | UNIQUE. Value stored in `key_dates[].type`             |
+| `color_class`       | text        | YES      | —                    | Tailwind classes for badge styling                     |
+| `sort_order`        | smallint    | NO       | `0`                  | Display order                                          |
+| `is_system`         | boolean     | NO       | `false`              | System-defined types cannot be deleted                |
+| `show_in_scadenze`  | boolean     | NO       | `true`               | Whether this type surfaces in the deadlines view       |
+| `created_by`        | uuid        | YES      | —                    | FK → `profiles(id)`                                    |
+| `created_at`        | timestamptz | NO       | `now()`              | Row creation timestamp                                 |
+
+**Indexes:**
+
+- PK on `id`
+- UNIQUE on `slug`
+
+---
+
 ### `grant_assignments`
 
 Assign internal staff to grants for tracking responsibility.
@@ -513,11 +537,11 @@ Junction table linking grants to their files. Replaces the old `grant_documents`
 - Tenants do not get a separate SELECT policy — they see published grants through the same public-read policy (consulting firms are read-only consumers, not owners of grant content).
 - `tenant_id` exists only to scope a white-label grant to one tenant's branding; it does not grant that tenant write access.
 
-### `grant_faq`, `grant_tags`, `grant_tag_assignments`
+### `grant_faq`, `grant_tags`, `grant_tag_assignments`, `grant_date_type_labels`
 
 | Policy                                   | Operation | Rule                                                                                                                                           |
-| ---------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public reads content of published grants | SELECT    | `grant_id IN (SELECT id FROM grants WHERE status = 'published')` (or, for tags/assignments, unconditional read — harmless categorization data) |
+| ----------------------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public reads content of published grants | SELECT    | `grant_id IN (SELECT id FROM grants WHERE status = 'published')` (or, for tags/assignments/date-type labels, unconditional read — harmless categorization data) |
 | Internal manages all                     | ALL       | `is_internal()`                                                                                                                                |
 
 ### `grant_versions`, `grant_assignments`, `grant_notes`, `grant_suggestions`
@@ -594,6 +618,7 @@ tenants (tenant_id, optional)        profiles (created_by/published_by/etc.)
 | `bando_faq`             | `grant_faq`             | Rename                                                 |
 | `bando_tags`            | `grant_tags`            | Rename                                                 |
 | `bando_tag_assignments` | `grant_tag_assignments` | Rename                                                 |
+| `date_type_labels`      | `grant_date_type_labels`| Rename. Still global (not per-grant), referenced only from `key_dates[].type` at the app level |
 | `bando_assignments`     | `grant_assignments`     | Rename                                                 |
 | `bando_notes`           | `grant_notes`           | Rename                                                 |
 | `bando_suggestions`     | `grant_suggestions`     | Rename                                                 |

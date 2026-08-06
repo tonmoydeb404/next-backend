@@ -1,0 +1,28 @@
+import { envConfigFn, validate } from '@/config/env.config';
+import { DatabaseModule } from '@/database/database.module';
+import { HealthModule } from '@/modules/health/health.module';
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate,
+      load: [envConfigFn],
+    }),
+    DatabaseModule,
+    HealthModule,
+  ],
+  controllers: [AppController],
+  providers: [
+    AppService,
+    { provide: APP_PIPE, useClass: ZodValidationPipe },
+    { provide: APP_INTERCEPTOR, useClass: ZodSerializerInterceptor },
+  ],
+})
+export class AppModule {}

@@ -87,6 +87,30 @@ Responsibilities:
 
 No Supabase Edge Functions unless strictly required.
 
+**Current setup:**
+
+- Path aliases: `@/*` → `./src/*` (via `tsconfig.json` `paths`), rewritten to relative paths in
+  `dist/` at build time by `tsc-alias` (`nest build && tsc-alias -p tsconfig.build.json`)
+- Structure: `src/modules/{domain}/` per feature (e.g. `modules/app`, `modules/health`), each with
+  its own controller/service/module files; `src/database/` holds the Drizzle client wiring and a
+  `repositories/` folder (one `{entity}.repository.ts` per table, injected into services — no
+  service should inject the Drizzle client directly)
+- Validation/serialization: `nestjs-zod` (`ZodValidationPipe` + `ZodSerializerInterceptor`,
+  registered globally in `AppModule`)
+- Env validation: `@nestjs/config` with a Zod schema (`src/config/env.validation.ts`) as the
+  single source of truth, exposed to the rest of the app via namespaced config factories
+  (`src/config/{app,database,cors}.config.ts`, registered via `registerAs`)
+- DB access: `DatabaseModule` (global), injects a Drizzle client (`DRIZZLE` token, via the
+  `InjectDatabase()` helper decorator) built from `@repo/db`
+- API docs: `@nestjs/swagger` document cleaned up via `nestjs-zod`'s `cleanupOpenApiDoc`, served
+  as a Scalar UI at `/reference` (`@scalar/nestjs-api-reference`)
+- Routes are versioned via NestJS URI versioning (`app.enableVersioning`), global prefix `/api`,
+  default version `1` — e.g. `/api/v1/...`; `GET /health` is `VERSION_NEUTRAL` (unversioned)
+- `GET /health` — `@nestjs/terminus` health check with a custom Drizzle DB-ping indicator
+- CORS allow-list driven by the `CORS_ORIGINS` env var
+- No `drizzle-zod`: shared validation schemas live in `packages/validators` as hand-written plain
+  Zod, decoupled from `@repo/db`'s Drizzle tables, so they stay safe to import into frontend apps
+
 ---
 
 ## Packages
@@ -94,18 +118,25 @@ No Supabase Edge Functions unless strictly required.
 ### `packages/db`
 
 Drizzle ORM schema, migrations, and seed scripts. Single source of truth for the database structure.
+Package name is `@repo/db` (repo convention, matching `@repo/eslint-config`/`@repo/typescript-config`).
 
 - **Consumer:** Backend only (never imported by frontend apps)
-- **Contains:** Drizzle table definitions, migration files, seed scripts, RLS policy definitions
-- **Reference:** `db/` folder at repo root holds human-readable schema docs
+- **Contains:** Drizzle table definitions (`postgres-js` driver), `drizzle.config.ts`, migrations
+- **Reference:** `docs/db/` folder holds human-readable schema docs
+- **Status:** scaffolded with the Auth & Identity domain (`profiles`, `internal_roles`, `tenants`,
+  `seats`) as the reference implementation. The other 8 domains (ATECO, geography, subjects,
+  grants, newsletter, matching, VAT lookups, assets) are not yet translated to Drizzle tables.
 
 ### `packages/validators`
 
-Zod schemas for runtime validation. Lightweight, frontend-safe.
+Zod schemas for runtime validation. Lightweight, frontend-safe. Package name is `@repo/validators`.
 
-- **Consumer:** All apps (backend, publicator, website)
+- **Consumer:** All apps (backend, publicator, website) — currently linked from the backend only;
+  add as a dependency to publicator/website when a form or API call needs to share a schema
 - **Constraint:** Zero backend dependencies — no Drizzle, no Node-only packages
 - **Contains:** Zod schemas for API request/response payloads, form validation
+- **Status:** scaffolded with an Auth & Identity reference (`updateProfileSchema`,
+  `inviteSeatSchema`) matching `packages/db`'s reference domain. Other domains added as needed.
 
 ### `packages/shared`
 
