@@ -9,9 +9,15 @@ import { apiReference } from '@scalar/nestjs-api-reference';
 import { setupGracefulShutdown } from '@tygra/nestjs-graceful-shutdown';
 import { cleanupOpenApiDoc } from 'nestjs-zod';
 import { join } from 'path';
+import { Logger, LoggerErrorInterceptor } from 'pino-nestjs';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
+  app.useLogger(app.get(Logger));
+  app.useGlobalInterceptors(new LoggerErrorInterceptor());
+
   const config = app.get(ConfigService<EnvConfig, true>);
   setupGracefulShutdown({ app });
 
@@ -33,11 +39,12 @@ async function bootstrap() {
 
   const PORT = config.get('APP.PORT', { infer: true });
   const HOST = config.get('APP.HOST', { infer: true });
+  const logger = app.get(Logger);
 
   await app.listen(PORT, HOST, () => {
     const url = `http://${HOST}:${PORT}`;
-    console.log(`🚀 Server is running on ${url}`);
-    console.log(`📖 API Reference: ${url}/reference`);
+    logger.log(`🚀 Server is running on ${url}`);
+    logger.log(`📖 API Reference: ${url}/reference`);
   });
 }
 void bootstrap();

@@ -18,6 +18,9 @@ const envSchema = z.object({
         .map((origin) => origin.trim())
         .filter(Boolean),
     ),
+  LOG_LEVEL: z
+    .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal'])
+    .optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -47,6 +50,10 @@ export const envConfigFn = () => {
       HOST: env.HOST,
       PORT: env.PORT,
       CORS_ORIGINS: env.CORS_ORIGINS,
+    },
+    LOGGING: {
+      LEVEL:
+        env.LOG_LEVEL ?? (env.NODE_ENV === 'development' ? 'debug' : 'info'),
     },
     DATABASE: {
       URL: env.DATABASE_URL,
