@@ -28,6 +28,7 @@
     "@nestjs/swagger": "^11.4.6",
     "@nestjs/terminus": "^11.1.1",
     "@repo/db": "workspace:^",
+    "@repo/supabase": "workspace:^",
     "@repo/validators": "workspace:^",
     "@scalar/nestjs-api-reference": "^1.2.12",
     "@tygra/nestjs-graceful-shutdown": "^2.0.0",

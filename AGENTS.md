@@ -15,6 +15,7 @@ packages/
   db/                 Drizzle ORM schema + migrations (@repo/db, backend-only consumer)
   validators/         Zod schemas, zero backend deps (@repo/validators, shared by all apps)
   store/              Redux Toolkit + RTK Query base API (@repo/store, frontend apps only)
+  supabase/           Supabase JS client factories (@repo/supabase, shared by all apps)
   eslint-config/      Shared eslint configs (@repo/eslint-config)
   typescript-config/  Shared tsconfig bases (@repo/typescript-config)
 docs/                 Architecture + per-domain DB schema docs (source of truth, read before big changes)
@@ -38,6 +39,7 @@ Full architecture reference: [docs/architecture.md](docs/architecture.md), [docs
 - **Env access is always through a validated `envConfig`**, never raw `process.env` scattered in code — see `src/config/env.config.ts` (frontends) / `src/config/env.validation.ts` + `registerAs` factories (backend).
 - **No new domain/module should be scaffolded ahead of an actual need.** Only Geography exists end-to-end (db → validators → backend module) as the reference implementation; the other 8 DB domains (see [docs/db/](docs/db/)) are documented but not yet implemented — follow the Geography pattern when adding a new one, don't pre-stub others.
 - **Async work uses Supabase Queues (`pgmq`)**, triggered by Vercel Cron hitting a backend endpoint — no Redis/BullMQ/persistent worker process (backend deploys as a stateless Vercel Function).
+- **`profiles`/`tenants`/`seats` are created/deleted in sync with `auth.users` at the DB level**, not in backend code — a Postgres trigger (`packages/supabase/migrations/`) provisions them on signup, and `ON DELETE CASCADE` FKs clean them up on user deletion. Never add backend logic to insert/delete these rows on signup/account-removal.
 - **Publicator-facing backend routes require AAL2 (2FA).** Any backend endpoint that exists to serve `apps/publicator` (internal/staff use) must enforce Supabase AAL2 (TOTP-completed session), not just a valid JWT — staff accounts are MFA-mandatory. Website/customer-facing routes don't require AAL2 unless the specific action demands it.
 - **Avoid `any`.** Do not use `any` or `as any`/unchecked type casts to silence TypeScript — narrow with proper types, generics, or zod-inferred types instead. If a cast is truly unavoidable (e.g. a third-party type gap), prefer a precise cast (`as SpecificType`) with a one-line comment explaining why, never `as any`.
 

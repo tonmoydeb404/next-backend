@@ -9,6 +9,7 @@ const envSchema = z.object({
   DATABASE_URL: z.url(),
   SUPABASE_URL: z.url(),
   SUPABASE_JWKS_URL: z.url(),
+  SUPABASE_SECRET_KEY: z.string().min(1),
   CORS_ORIGINS: z
     .string()
     .default('')
@@ -61,6 +62,7 @@ export const envConfigFn = () => {
     SUPABASE: {
       URL: env.SUPABASE_URL,
       JWKS_URL: env.SUPABASE_JWKS_URL,
+      SECRET_KEY: env.SUPABASE_SECRET_KEY,
     },
   };
 };

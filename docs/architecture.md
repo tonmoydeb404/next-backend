@@ -153,6 +153,24 @@ Package name is `@repo/db` (repo convention, matching `@repo/eslint-config`/`@re
   module is built. The other 7 domains (ATECO, subjects, grants, newsletter, matching, VAT
   lookups, assets) are not yet translated to Drizzle tables.
 
+### `packages/supabase`
+
+Shared Supabase JS clients. Package name is `@repo/supabase`.
+
+- **Consumer:** All apps — `apps/publicator`/`apps/website` use the browser/server client factories
+  (`@supabase/ssr`) for login/MFA/session cookies (each app still owns its own `middleware.ts`,
+  just calling the server factory); `apps/backend` uses the admin client (`@supabase/supabase-js`,
+  secret key) for admin operations (e.g. `auth.admin.deleteUser`).
+- **Contains:** `src/browser.ts` (`createSupabaseBrowserClient`), `src/server.ts`
+  (`createSupabaseServerClient`, takes a caller-supplied cookie adapter), `src/admin.ts`
+  (`createSupabaseAdminClient`, secret key — backend only, key never exposed to frontends),
+  `src/types/database.types.ts` (generated `Database` type, all three clients are parameterized
+  with it)
+- **Types:** `pnpm supabase:types` (repo root) runs `supabase gen types typescript --linked` and
+  writes `src/types/database.types.ts` from the linked project's live schema — regenerate after
+  every `supabase:push` so types stay in sync; committed to the repo, not generated at build time
+- **Status:** client factories only — no login/MFA UI or backend Auth module/guards yet
+
 ### `packages/validators`
 
 Zod schemas for runtime validation. Lightweight, frontend-safe. Package name is `@repo/validators`.
@@ -207,6 +225,21 @@ Pure TypeScript types, enums, and constants.
 - **Tenant seat holders** (Website/Studio): regular customer accounts assigned to a vacant seat on a tenant, `seat_role`-based access — there is no separate `agency` account type
 - **Single identity:** one email = one account across all apps
 - **Suspension:** via Supabase Auth `banned_until` — no `is_active` column, blocks sign-in at auth layer
+
+### Profile/Tenant Provisioning
+
+Creating/deleting `profiles`/`tenants`/`seats` in lockstep with `auth.users` is handled entirely at
+the DB level, not in backend application code:
+
+- **Creation:** a `SECURITY DEFINER` Postgres trigger (`handle_new_user`) on `auth.users` inserts a
+  `profiles` row + a personal `tenants` row + an owner `seats` row on signup — works regardless of
+  signup path (Supabase Auth API, magic link, OAuth, etc.).
+- **Deletion:** plain `ON DELETE CASCADE` FKs (`profiles.id → auth.users.id`, `tenants`/`seats` →
+  `profiles.id`) — deleting an `auth.users` row (e.g. via `supabase.auth.admin.deleteUser`) cascades
+  automatically; the backend never manually deletes these rows.
+- This SQL lives in `packages/supabase/migrations/` (Supabase-CLI-managed), separate from
+  `packages/db`'s drizzle-kit migrations, since it references `auth.users` — see
+  [packages/supabase/README.md](../packages/supabase/README.md) for the required migration ordering.
 
 ### JWT Validation
 

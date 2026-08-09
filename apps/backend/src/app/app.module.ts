@@ -4,6 +4,7 @@ import { DatabaseModule } from '@/database/database.module';
 import { CoreModule } from '@/modules/core/core.module';
 import { GeographyModule } from '@/modules/geography/geography.module';
 import { HealthModule } from '@/modules/health/health.module';
+import { SupabaseModule } from '@/supabase/supabase.module';
 import { Module, RequestMethod } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
@@ -39,6 +40,7 @@ import { LoggerModule } from 'pino-nestjs';
     }),
     GracefulShutdownModule.forRoot(),
     DatabaseModule,
+    SupabaseModule,
     CoreModule,
     HealthModule,
     GeographyModule,

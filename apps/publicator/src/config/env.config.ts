@@ -10,6 +10,8 @@ const envSchema = z.object({
     .enum(["development", "staging", "production"])
     .default("development"),
   NEXT_PUBLIC_BACKEND_BASE_URL: z.url().default("http://localhost:3000"),
+  NEXT_PUBLIC_SUPABASE_URL: z.url(),
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -36,6 +38,10 @@ export const envConfig = {
   },
   BACKEND: {
     BASE_URL: env.NEXT_PUBLIC_BACKEND_BASE_URL,
+  },
+  SUPABASE: {
+    URL: env.NEXT_PUBLIC_SUPABASE_URL,
+    PUBLISHABLE_KEY: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   },
 };
 
