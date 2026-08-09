@@ -147,10 +147,11 @@ Package name is `@repo/db` (repo convention, matching `@repo/eslint-config`/`@re
 - **Consumer:** Backend only (never imported by frontend apps)
 - **Contains:** Drizzle table definitions (`postgres-js` driver), `drizzle.config.ts`, migrations
 - **Reference:** `docs/db/` folder holds human-readable schema docs
-- **Status:** scaffolded with the Geography domain (`regions`, `provinces`) as the reference
-  implementation. The Auth & Identity domain (`profiles`, `internal_roles`, `tenants`, `seats`)
-  was removed (2026-08-07) — no backend Auth module exists yet to consume it; re-add once that
-  module is built. The other 7 domains (ATECO, subjects, grants, newsletter, matching, VAT
+- **Status:** Geography (`regions`, `provinces`) and Auth & Identity (`profiles`,
+  `internal_roles`, `tenants`, `seats`) domains are translated to Drizzle tables; matching
+  triggers/RLS/helper functions for Auth & Identity live in `packages/supabase/migrations`
+  (cross-schema `auth.users` references — see that package). No backend Auth module consumes
+  these tables yet. The other 7 domains (ATECO, subjects, grants, newsletter, matching, VAT
   lookups, assets) are not yet translated to Drizzle tables.
 
 ### `packages/supabase`
