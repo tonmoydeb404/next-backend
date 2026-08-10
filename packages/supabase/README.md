@@ -1,20 +1,21 @@
 # `@repo/supabase`
 
 Shared Supabase JS clients (`src/browser.ts`/`src/server.ts`/`src/admin.ts`) **and** the
-Supabase CLI-managed project for this repo's database: `config.toml` + raw SQL `migrations/` that
-touch the `auth` schema (triggers, functions, cross-schema FKs) — anything `drizzle-kit` can't
-express from a `public`-schema-only Drizzle model (see `packages/db`).
+Supabase CLI-managed project for this repo's database: `config.toml` + raw SQL `migrations/` —
+the single source of truth for the entire schema (tables, indexes, FKs, triggers, functions, RLS,
+grants). `packages/db` (Drizzle) only consumes this schema for typed queries in the backend; it
+does not generate or own any migrations.
 
-## Migration order
+## Why migrations live here, not in packages/db
 
-Two independent migration tools manage this database:
+Supabase branching replays only this folder's migrations when spinning up a new branch database —
+keeping the full schema here (not split across a second `drizzle-kit` migration history) means
+every branch comes up complete automatically, with no separate manual step. It also avoids
+ordering coordination between two independent migration tools touching the same database.
 
-1. `packages/db` (drizzle-kit) — `public` schema tables (e.g. `profiles`/`tenants`/`seats`).
-2. `packages/supabase/migrations` (this folder, Supabase CLI) — anything referencing `auth.users`
-   (triggers, functions, FKs from `public` tables back to `auth.users`).
-
-**Always apply drizzle-kit migrations before the matching Supabase CLI migration** — the SQL here
-references tables that drizzle-kit creates.
+Every migration in this folder is written to be safely re-runnable (`IF NOT EXISTS`, guarded
+`DO $$ ... EXCEPTION WHEN duplicate_object$$` blocks for `CREATE TYPE`/`ADD CONSTRAINT`,
+`DROP ... IF EXISTS` before triggers/policies, `CREATE OR REPLACE FUNCTION`).
 
 ## Commands (run from repo root)
 
@@ -25,7 +26,7 @@ pnpm supabase:pull         # supabase db pull (check for drift against the linke
 pnpm supabase:types        # regenerate src/types/database.types.ts from the linked project
 ```
 
-All four scripts pass `--workdir packages/supabase`. `supabase link --project-ref <ref> --workdir
+All four scripts pass `--workdir packages`. `supabase link --project-ref <ref> --workdir
 packages/supabase` must be run once per machine before `push`/`pull`/`types` — requires the real
 Supabase project ref and an access token, so it isn't scripted here.
 
@@ -35,4 +36,3 @@ Supabase project ref and an access token, so it isn't scripted here.
 three client factories) straight from the linked project's live schema. Run it after applying new
 migrations (`supabase:push`) so the type stays in sync — it's committed to the repo, not generated
 at build time, so consumers don't need a linked project just to type-check.
-

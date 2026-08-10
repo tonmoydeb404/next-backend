@@ -141,22 +141,24 @@ province}/`, mirroring `@repo/validators`'s `api/<domain>/<resource>/` layout), 
 
 ### `packages/db`
 
-Drizzle ORM schema, migrations, and seed scripts. Single source of truth for the database structure.
+Drizzle ORM schema for typed queries — a hand-maintained TS mirror of the schema that actually
+lives in `packages/supabase/migrations` (see below for why migrations aren't authored here).
 Package name is `@repo/db` (repo convention, matching `@repo/eslint-config`/`@repo/typescript-config`).
 
 - **Consumer:** Backend only (never imported by frontend apps)
-- **Contains:** Drizzle table definitions (`postgres-js` driver), `drizzle.config.ts`, migrations
+- **Contains:** Drizzle table definitions (`postgres-js` driver), `drizzle.config.ts` (backs
+  `db:studio` only — no `db:generate`/`migrate`/`push`)
 - **Reference:** `docs/db/` folder holds human-readable schema docs
 - **Status:** Geography (`regions`, `provinces`) and Auth & Identity (`profiles`,
-  `internal_roles`, `tenants`, `seats`) domains are translated to Drizzle tables; matching
-  triggers/RLS/helper functions for Auth & Identity live in `packages/supabase/migrations`
-  (cross-schema `auth.users` references — see that package). No backend Auth module consumes
-  these tables yet. The other 7 domains (ATECO, subjects, grants, newsletter, matching, VAT
-  lookups, assets) are not yet translated to Drizzle tables.
+  `internal_roles`, `tenants`, `seats`) domains are mirrored as Drizzle tables, matching the
+  schema created by `packages/supabase/migrations`. No backend Auth module consumes these tables
+  yet. The other 7 domains (ATECO, subjects, grants, newsletter, matching, VAT lookups, assets)
+  are not yet mirrored.
 
 ### `packages/supabase`
 
-Shared Supabase JS clients. Package name is `@repo/supabase`.
+Shared Supabase JS clients **and** the sole schema source of truth (migrations). Package name is
+`@repo/supabase`.
 
 - **Consumer:** All apps — `apps/publicator`/`apps/website` use the browser/server client factories
   (`@supabase/ssr`) for login/MFA/session cookies (each app still owns its own `middleware.ts`,
@@ -166,11 +168,15 @@ Shared Supabase JS clients. Package name is `@repo/supabase`.
   (`createSupabaseServerClient`, takes a caller-supplied cookie adapter), `src/admin.ts`
   (`createSupabaseAdminClient`, secret key — backend only, key never exposed to frontends),
   `src/types/database.types.ts` (generated `Database` type, all three clients are parameterized
-  with it)
+  with it), and `migrations/` — raw SQL, the single source of truth for the entire schema (tables,
+  indexes, FKs, triggers, functions, RLS, grants), written idempotently. Kept here rather than
+  split into `packages/db`/`drizzle-kit` so Supabase branching (which only replays this folder)
+  can build a complete database for every branch with no extra manual step.
 - **Types:** `pnpm supabase:types` (repo root) runs `supabase gen types typescript --linked` and
   writes `src/types/database.types.ts` from the linked project's live schema — regenerate after
   every `supabase:push` so types stay in sync; committed to the repo, not generated at build time
-- **Status:** client factories only — no login/MFA UI or backend Auth module/guards yet
+- **Status:** client factories + Geography/Auth & Identity schema migrations exist — no login/MFA
+  UI or backend Auth module/guards yet
 
 ### `packages/validators`
 

@@ -12,7 +12,7 @@ apps/
   publicator/   Next.js (App Router) — internal admin dashboard
   website/      Next.js (App Router) — public site (Matchator + Studio)
 packages/
-  db/                 Drizzle ORM schema + migrations (@repo/db, backend-only consumer)
+  db/                 Drizzle ORM schema for typed queries (@repo/db, backend-only consumer)
   validators/         Zod schemas, zero backend deps (@repo/validators, shared by all apps)
   store/              Redux Toolkit + RTK Query base API (@repo/store, frontend apps only)
   supabase/           Supabase JS client factories (@repo/supabase, shared by all apps)
@@ -95,10 +95,13 @@ Package-specific:
 
 ```sh
 # packages/db
-pnpm --filter @repo/db db:generate  # drizzle-kit generate (new migration from schema changes)
-pnpm --filter @repo/db db:migrate   # drizzle-kit migrate
-pnpm --filter @repo/db db:push      # drizzle-kit push
-pnpm --filter @repo/db db:studio    # drizzle-kit studio
+pnpm --filter @repo/db db:studio    # drizzle-kit studio (browse via the src/schema/*.ts types)
+
+# packages/supabase
+pnpm supabase:new <name>            # supabase migration new <name> (schema source of truth)
+pnpm supabase:push                  # apply pending migrations to the linked project
+pnpm supabase:pull                  # check for drift against the linked project
+pnpm supabase:types                 # regenerate src/types/database.types.ts
 
 # apps/backend
 pnpm --filter backend test          # jest unit tests
@@ -108,7 +111,8 @@ pnpm --filter backend test:e2e      # jest e2e tests
 ## Validation before finishing a task
 
 - Prefer running the narrowest relevant command first (`pnpm --filter <pkg> check-types`, `pnpm --filter <pkg> lint`), then the root `pnpm check-types`/`pnpm lint` if the change spans packages.
-- After editing `packages/db` schema, regenerate migrations (`db:generate`) — never hand-edit generated SQL in `packages/db/migrations/`.
+- Schema changes are authored as SQL migrations in `packages/supabase/migrations/` (the sole schema source of truth, tables through RLS/grants) — `packages/db`'s TS schema is kept in sync by hand to match, for typed backend queries only.
+- **Every `packages/supabase/migrations/*.sql` file must be idempotent (safely re-runnable)** — never a plain one-shot `CREATE`/`ALTER`. Use: `CREATE TABLE IF NOT EXISTS` with just the PK, then one `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` per column (so re-running after a later column addition still applies it, not just the initial create); a guarded `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` block for `CREATE TYPE` and `ALTER TABLE ADD CONSTRAINT` (neither supports `IF NOT EXISTS`); `CREATE INDEX IF NOT EXISTS`; `CREATE OR REPLACE FUNCTION`; `DROP TRIGGER IF EXISTS`/`DROP POLICY IF EXISTS` before `CREATE TRIGGER`/`CREATE POLICY` (neither supports `IF NOT EXISTS` or `OR REPLACE`).
 - After editing `packages/validators`, check whether `apps/backend/src/modules/**/dto` needs matching updates.
 
 ## Documentation policy
