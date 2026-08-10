@@ -1,26 +1,26 @@
 import { createHandler } from "@/lib/api/create-handler";
 import { db } from "@/lib/api/database";
 import { sql } from "@repo/db";
+import {
+  formatResponse,
+  healthCheckResponseSchema,
+  type HealthCheckResponse,
+} from "@repo/validators";
 import { NextResponse } from "next/server";
-import { z } from "zod";
-
-const healthResponseSchema = z.object({
-  status: z.enum(["ok", "error"]),
-  info: z.object({
-    database: z.object({ status: z.string(), message: z.string().optional() }),
-  }),
-  details: z.object({
-    database: z.object({ status: z.string(), message: z.string().optional() }),
-  }),
-});
 
 export const GET = createHandler({
   openapi: {
     summary: "Health check",
     tags: ["Health"],
     responses: {
-      200: { description: "Service healthy", schema: healthResponseSchema },
-      503: { description: "Service unhealthy", schema: healthResponseSchema },
+      200: {
+        description: "Service healthy",
+        schema: healthCheckResponseSchema,
+      },
+      503: {
+        description: "Service unhealthy",
+        schema: healthCheckResponseSchema,
+      },
     },
   },
   handler: async () => {
@@ -35,24 +35,20 @@ export const GET = createHandler({
     }
 
     const status = dbStatus === "up" ? "ok" : "error";
+    const statusCode = status === "ok" ? 200 : 503;
+    const database = {
+      status: dbStatus,
+      ...(dbMessage && { message: dbMessage }),
+    };
 
     return NextResponse.json(
-      {
-        status,
-        info: {
-          database: {
-            status: dbStatus,
-            ...(dbMessage && { message: dbMessage }),
-          },
-        },
-        details: {
-          database: {
-            status: dbStatus,
-            ...(dbMessage && { message: dbMessage }),
-          },
-        },
-      },
-      { status: status === "ok" ? 200 : 503 },
+      formatResponse({
+        statusCode,
+        message: status === "ok" ? "Service healthy" : "Service unhealthy",
+        results: { status, info: { database }, details: { database } },
+        meta: {},
+      }) satisfies HealthCheckResponse,
+      { status: statusCode },
     );
   },
 });
