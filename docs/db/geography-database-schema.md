@@ -103,7 +103,7 @@ Italy's ~107 provinces (including metropolitan cities). Immutable reference data
 - `tenants.address` (jsonb) → stores `province_code`, `region_code`
 - `grant_match_criteria` (geographic eligibility) → stores region/province codes for matching, see [matching-database-schema.md](matching-database-schema.md)
 
-**Pattern:** every table that needs a location stores only `province_code` and/or `region_code`. Names are resolved via JOIN (backend) or a small cached client-side map (frontend — ~127 rows total, safe to load once).
+**Pattern:** every table that needs a location stores only `province_code` and/or `region_code`. Names are resolved via JOIN (Publicator API) or a small cached client-side map (frontend — ~127 rows total, safe to load once).
 
 ---
 

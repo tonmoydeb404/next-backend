@@ -7,10 +7,10 @@ import {
   inArray,
   isNull,
   type AnyColumn,
-  type Database,
   type SQL,
   type Table,
-} from '@repo/db';
+} from "drizzle-orm";
+import type { Database } from "../../client.ts";
 import type {
   ColumnKey,
   Filters,
@@ -18,7 +18,7 @@ import type {
   Pagination,
   QueryOptions,
   SortBy,
-} from './types';
+} from "./types.ts";
 
 export abstract class RepositoryBuilder<TTable extends Table> {
   protected constructor(
@@ -26,7 +26,6 @@ export abstract class RepositoryBuilder<TTable extends Table> {
     protected readonly db: Database,
   ) {}
 
-  /** Returns a clone bound to a transaction's db handle, for use inside `db.transaction()`. */
   withTx(tx: Database): this {
     const prototype = Object.getPrototypeOf(this) as object;
     const clone = Object.create(prototype) as this;
@@ -51,7 +50,7 @@ export abstract class RepositoryBuilder<TTable extends Table> {
       const column = this.table[
         s.field as keyof TTable
       ] as unknown as AnyColumn;
-      return s.order === 'desc' ? desc(column) : asc(column);
+      return s.order === "desc" ? desc(column) : asc(column);
     });
   }
 
@@ -63,9 +62,9 @@ export abstract class RepositoryBuilder<TTable extends Table> {
       const column = this.table[key as keyof TTable] as unknown as AnyColumn;
       if (!column || !operator) continue;
 
-      if ('eq' in operator) conditions.push(eq(column, operator.eq));
-      else if ('in' in operator) conditions.push(inArray(column, operator.in));
-      else if ('isNull' in operator && operator.isNull)
+      if ("eq" in operator) conditions.push(eq(column, operator.eq));
+      else if ("in" in operator) conditions.push(inArray(column, operator.in));
+      else if ("isNull" in operator && operator.isNull)
         conditions.push(isNull(column));
     }
 
@@ -78,12 +77,11 @@ export abstract class RepositoryBuilder<TTable extends Table> {
     return { page, pageSize, limit, offset };
   }
 
-  /** Finds a `deletedAt`/`deleted_at` column on the table, if this entity supports soft delete. */
   protected getSoftDeleteColumn(): keyof TTable | undefined {
     const tableKeys = Object.keys(this.table) as Array<keyof TTable>;
     return (
-      tableKeys.find((k) => k === 'deletedAt') ??
-      tableKeys.find((k) => k === 'deleted_at')
+      tableKeys.find((k) => k === "deletedAt") ??
+      tableKeys.find((k) => k === "deleted_at")
     );
   }
 
@@ -111,14 +109,13 @@ export abstract class RepositoryBuilder<TTable extends Table> {
     return this.db.update(this.table);
   }
 
-  /** Hard delete by default; pass `soft: true` for entities with a `deletedAt` column. */
   delete(soft = false) {
     if (!soft) return this.db.delete(this.table).$dynamic();
 
     const col = this.getSoftDeleteColumn();
     if (!col) {
       throw new Error(
-        'Soft delete requested but no deletedAt/deleted_at column found',
+        "Soft delete requested but no deletedAt/deleted_at column found",
       );
     }
 
@@ -127,7 +124,6 @@ export abstract class RepositoryBuilder<TTable extends Table> {
       .$dynamic();
   }
 
-  /** `qb` must be a query builder with `.where()` still available (not yet called). */
   byProperty<T>(qb: T, key: keyof InferSelectModel<TTable>, value: unknown): T {
     const column = this.table[key as keyof TTable] as unknown as AnyColumn;
     const whereable = qb as unknown as { where: (condition: SQL) => T };

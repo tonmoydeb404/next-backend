@@ -4,7 +4,6 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "dev:backend": "turbo run dev --filter=backend",
     "dev:publicator": "turbo run dev --filter=publicator",
     "dev:website": "turbo run dev --filter=website",
     "lint": "turbo run lint",

@@ -16,10 +16,9 @@ This Turborepo includes the following packages/apps:
 
 ### Apps and Packages
 
-- `apps/publicator`: internal admin dashboard (Next.js)
+- `apps/publicator`: internal admin dashboard (Next.js) + the API (`src/app/backend/api`)
 - `apps/website`: public-facing site (Next.js)
-- `apps/backend`: API server (NestJS)
-- `@repo/db`: Drizzle ORM schema, consumed by the backend only
+- `@repo/db`: Drizzle ORM schema, consumed by `apps/publicator` only
 - `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
 - `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
 

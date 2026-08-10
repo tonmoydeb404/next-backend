@@ -17,10 +17,10 @@ graph TB
         end
     end
 
-    subgraph "Backend (NestJS on Vercel)"
-        API["API Gateway<br/><i>/api/v1/</i>"]
-        AuthGuard["Auth Guard<br/><i>JWKS RS256 + AAL2</i>"]
-        Modules["NestJS Modules<br/><i>Grants · Subjects<br/>Newsletter · VAT</i>"]
+    subgraph "Publicator API (Next.js Route Handlers, on Vercel)"
+        API["API<br/><i>/backend/api/v1/</i>"]
+        AuthGuard["withAuth()<br/><i>JWKS RS256 + AAL2</i>"]
+        Modules["Route Handlers<br/><i>Grants · Subjects<br/>Newsletter · VAT</i>"]
         Queue["Queue Consumer<br/><i>reads pgmq batch</i>"]
     end
 
@@ -49,7 +49,7 @@ graph TB
     WebAuth -->|"login / register / MFA"| SupaAuth
     Publicator -->|"login / MFA"| SupaAuth
 
-    %% Data: frontends send JWT to Backend
+    %% Data: frontends send JWT to Publicator API
     Publicator -->|"JWT"| API
     Matchator -->|"JWT"| API
     Studio -->|"JWT"| API
@@ -58,7 +58,7 @@ graph TB
     BOH -->|"webhook"| API
     Stripe -->|"webhook"| API
 
-    %% Backend internals
+    %% Publicator API internals
     API --> AuthGuard
     AuthGuard -.->|"JWKS verify"| SupaAuth
     AuthGuard --> Modules
@@ -67,18 +67,18 @@ graph TB
     Queue -->|"read/pop"| SupaQueue
     Queue -->|"dispatch"| EmailProvider
 
-    %% Backend → Engines (future)
+    %% Publicator API → Engines (future)
     Modules -.->|"triggers"| Extractor
     Modules -.->|"triggers"| Matching
 
-    %% Backend → Supabase
+    %% Publicator API → Supabase
     Modules -->|"Drizzle"| SupaDB
     Extractor -.->|"Drizzle"| SupaDB
     Extractor -.->|"read docs"| SupaStorage
     Matching -.->|"Drizzle"| SupaDB
 
     %% Package dependencies
-    PkgDB -->|"backend only"| Modules
+    PkgDB -->|"publicator only"| Modules
     PkgValidators -.-> Publicator
     PkgValidators -.-> Matchator
     PkgValidators -.-> Modules
@@ -114,7 +114,7 @@ graph TB
 
 - **Blue** — Publicator (admin dashboard)
 - **Green** — Website (Next.js) — auth pages + Matchator/Studio route groups
-- **Orange** — Backend (NestJS on Vercel)
+- **Orange** — Publicator API (Next.js Route Handlers, on Vercel)
 - **Red** — Vercel Cron (scheduled queue-consumer trigger)
 - **Purple** — Shared packages
 - **Gray** — External services
@@ -124,6 +124,6 @@ graph TB
 
 - Auth (login/register/MFA) → **Website** handles all auth flows, calls **Supabase Auth directly**
 - Matchator and Studio are route-group layouts under the same Next.js app, sharing auth
-- Data operations → frontends send JWT to **Backend API**, backend validates via JWKS
-- BOH → Backend webhook → Supabase Queue (pgmq) → Extractor → DB
-- Extractor and Matching Engine are **out of scope** — shown as future integrations triggered by Backend
+- Data operations → frontends send JWT to **Publicator API**, it validates via JWKS
+- BOH → Publicator webhook → Supabase Queue (pgmq) → Extractor → DB
+- Extractor and Matching Engine are **out of scope** — shown as future integrations triggered by the Publicator API
