@@ -64,7 +64,7 @@ export default function Home() {
   const { data: provinces, isLoading: provincesLoading } =
     useProvincesListQuery({});
 
-  const isUp = health?.status === "ok";
+  const isUp = health?.results.status === "ok";
 
   return (
     <div className="flex flex-1 flex-col bg-zinc-50 dark:bg-black">
@@ -109,28 +109,30 @@ export default function Home() {
                   <RiCloseCircleFill className="size-6 text-destructive" />
                 )}
                 <span className="text-lg font-semibold capitalize">
-                  {health?.status}
+                  {health?.results.status}
                 </span>
               </div>
             )}
-            {health?.details && (
+            {health?.results.details && (
               <ul className="mt-3 space-y-1 text-xs text-muted-foreground">
-                {Object.entries(health.details).map(([name, indicator]) => (
-                  <li key={name} className="flex items-center gap-1.5">
-                    <RiDatabase2Line className="size-3.5" />
-                    <span className="capitalize">{name}</span>
-                    <span
-                      className={cn(
-                        "ml-auto font-medium",
-                        indicator.status === "up"
-                          ? "text-emerald-500"
-                          : "text-destructive",
-                      )}
-                    >
-                      {indicator.status}
-                    </span>
-                  </li>
-                ))}
+                {Object.entries(health.results.details).map(
+                  ([name, indicator]) => (
+                    <li key={name} className="flex items-center gap-1.5">
+                      <RiDatabase2Line className="size-3.5" />
+                      <span className="capitalize">{name}</span>
+                      <span
+                        className={cn(
+                          "ml-auto font-medium",
+                          indicator.status === "up"
+                            ? "text-emerald-500"
+                            : "text-destructive",
+                        )}
+                      >
+                        {indicator.status}
+                      </span>
+                    </li>
+                  ),
+                )}
               </ul>
             )}
           </BentoCard>

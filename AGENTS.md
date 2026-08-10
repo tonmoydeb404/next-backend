@@ -51,6 +51,18 @@ Full architecture reference: [docs/architecture.md](docs/architecture.md), [docs
 - **`packages/validators`**: `src/db/<domain>/<entity>.ts` mirrors a DB table 1:1. `src/api/<domain>/<resource>/<resource>-details.ts` / `-list.ts` / `-common.ts` hold response/param/query schemas (fixed filenames — don't invent new ones like `*-code-param.ts`). Response envelopes built once here via `buildResponseSchema`/`buildPaginatedResponseSchema` from `src/common/response.ts`. Cross-folder imports inside this package use Node subpath imports (`#*`), not `@/*` aliases.
 - **`apps/publicator/src/app/backend/`**: see [Backend API route rules](#backend-api-route-rules-appspublicatorsrcappbackend) below.
 - **`apps/publicator` / `apps/website`**: `src/store/` has `store.ts`, `hooks.ts`, `wrapper.tsx`, `features/<name>/` (local UI-only slices). API endpoints live in `packages/store/src/endpoints/<domain>/` via `Api.injectEndpoints`, typed from `@repo/validators`.
+- **`apps/publicator` / `apps/website`**: each app has a `src/config/paths.config.ts` exporting a single `paths` object with every route in the app — nested per section, leaf values are either a literal string or a function returning a string for dynamic segments, e.g.:
+  ```ts
+  export const paths = {
+    root: "/",
+    page: "/page",
+    nestedPage: {
+      root: "/nested-page",
+      details: (slug: string) => `/nested-page/${slug}`,
+    },
+  };
+  ```
+  Never hardcode a naked path string (`"/some/route"`, template-literal route) in a component, `Link`, `redirect()`, or router call — always import from `paths` instead.
 - Env template files are `example.env` (not `.env.example`) across the repo; local values go in gitignored `.env.local`.
 
 ## Frontend page/view structure (`apps/publicator`, `apps/website`)
