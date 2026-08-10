@@ -9,7 +9,8 @@
     "build": "next build",
     "start": "next start --port 4002",
     "lint": "eslint",
-    "generate:openapi": "tsx scripts/generate-openapi.ts"
+    "generate:openapi": "tsx scripts/generate-openapi.ts",
+    "sync:roles": "tsx scripts/sync-super-admin-role.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -19,6 +20,7 @@
     "@repo/store": "workspace:*",
     "@repo/supabase": "workspace:*",
     "@repo/validators": "workspace:*",
+    "@hookform/resolvers": "^5.7.1",
     "@scalar/nextjs-api-reference": "^0.9.9",
     "class-variance-authority": "^0.7.1",
     "jose": "^6.0.11",
@@ -28,6 +30,7 @@
     "next-themes": "^0.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-hook-form": "^7.85.0",
     "react-redux": "^9.2.0",
     "shadcn": "^4.16.1",
     "tailwind-merge": "^3.6.0",

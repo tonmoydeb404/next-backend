@@ -182,10 +182,10 @@ Shared Supabase JS clients **and** the sole schema source of truth (migrations).
 `@repo/supabase`.
 
 - **Consumer:** All apps — `apps/publicator`/`apps/website` use the browser/server client factories
-  (`@supabase/ssr`) for login/MFA/session cookies (each app still owns its own `middleware.ts`,
-  just calling the server factory); `apps/publicator`'s API routes (`src/lib/api/supabase-admin.ts`)
-  use the admin client (`@supabase/supabase-js`, secret key, server-only) for admin operations
-  (e.g. `auth.admin.deleteUser`).
+  (`@supabase/ssr`) for login/MFA/session cookies (each app owns its own `src/proxy.ts` — Next.js
+  16's rename of `middleware.ts` — calling the server factory); `apps/publicator`'s API routes
+  (`src/lib/api/supabase-admin.ts`) use the admin client (`@supabase/supabase-js`, secret key,
+  server-only) for admin operations (e.g. `auth.admin.deleteUser`).
 - **Contains:** `src/browser.ts` (`createSupabaseBrowserClient`), `src/server.ts`
   (`createSupabaseServerClient`, takes a caller-supplied cookie adapter), `src/admin.ts`
   (`createSupabaseAdminClient`, secret key — server-only, key never exposed to the browser),
@@ -197,8 +197,10 @@ Shared Supabase JS clients **and** the sole schema source of truth (migrations).
 - **Types:** `pnpm supabase:types` (repo root) runs `supabase gen types typescript --linked` and
   writes `src/types/database.types.ts` from the linked project's live schema — regenerate after
   every `supabase:push` so types stay in sync; committed to the repo, not generated at build time
-- **Status:** client factories + Geography/Auth & Identity schema migrations exist — no login/MFA
-  UI or Auth API routes/guards yet
+- **Status:** client factories + Geography/Auth & Identity schema migrations exist; email/password
+  sign-in (`/auth/sign-in`) and route protection (`src/proxy.ts` +, for Publicator, an
+  `(app)/layout.tsx` staff-only guard checking `profiles.internal_role_id`) are implemented in
+  both apps — MFA (AAL2) enrollment/verify UI and Auth API routes/guards are not yet built
 
 ### `packages/validators`
 

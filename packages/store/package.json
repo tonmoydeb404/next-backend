@@ -12,8 +12,12 @@
   "scripts": {
     "check-types": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "react": "^19"
+  },
   "dependencies": {
     "@reduxjs/toolkit": "^2.11.2",
+    "@repo/supabase": "workspace:*",
     "@repo/validators": "workspace:*",
     "react-redux": "^9.2.0",
     "zod": "4.4.3"
@@ -21,6 +25,7 @@
   "devDependencies": {
     "@repo/typescript-config": "workspace:^",
     "@types/node": "^26.1.2",
+    "@types/react": "^19",
     "typescript": "5.9.2"
   }
 }

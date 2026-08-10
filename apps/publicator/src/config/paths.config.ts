@@ -2,4 +2,9 @@
 // string elsewhere; import `paths` instead.
 export const paths = {
   root: "/",
+  auth: {
+    root: "/auth",
+    signIn: "/auth/sign-in",
+    forbidden: "/auth/forbidden",
+  },
 };

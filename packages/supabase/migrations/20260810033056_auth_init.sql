@@ -236,6 +236,31 @@ create trigger guard_personal_tenant_delete
   for each row
   execute function public.prevent_personal_tenant_delete();
 
+-- Deleting a profile (directly, or via the ON DELETE CASCADE from auth.users) never deleted its
+-- personal tenants row on its own — a FK only cascades from the referenced table to the
+-- referencing table, never the reverse, so profiles.personal_tenant_id -> tenants.id alone can't
+-- clean up the tenant; guard_personal_tenant_delete above would then block cleaning it up
+-- manually too, since it still looked "referenced" until this trigger runs.
+create or replace function public.handle_profile_deleted()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- By this point the profiles row is already gone, so is_personal_tenant() (used by
+  -- guard_personal_tenant_delete) correctly returns false for old.personal_tenant_id.
+  delete from public.tenants where id = old.personal_tenant_id;
+  return old;
+end;
+$$;
+
+drop trigger if exists on_profile_deleted on public.profiles;
+create trigger on_profile_deleted
+  after delete on public.profiles
+  for each row
+  execute function public.handle_profile_deleted();
+
 create or replace function public.prevent_personal_seat_removal()
 returns trigger
 language plpgsql

@@ -1,7 +1,8 @@
+import type { Permission } from "@repo/validators";
 import { NextRequest, NextResponse } from "next/server";
 import type { z } from "zod";
 import { handleError } from "./error-handler";
-import { withAuth, type AuthSession } from "./with-auth";
+import { withAuth, type AuthSession, type SeatRole } from "./with-auth";
 
 type RouteContext = { params: Promise<Record<string, string>> };
 
@@ -39,6 +40,12 @@ type HandlerConfig<
   body?: TBody;
   auth?: boolean;
   aal2?: boolean;
+  // Staff-only routes: session.internalRole?.permissions must satisfy this list.
+  permissions?: Permission[];
+  permissionsLogic?: "and" | "or"; // default: "and"
+  // Tenant-scoped routes: the seat for the `x-tenant-id` header must satisfy this list.
+  tenantRoles?: SeatRole[];
+  tenantRolesLogic?: "and" | "or"; // default: "and"
   openapi: OpenApiMeta;
   handler: (
     input: ParsedInput<TParams, TQuery, TBody>,
@@ -72,7 +79,13 @@ export function createHandler<
             session = s;
             return NextResponse.next();
           },
-          { requireAal2: config.aal2 },
+          {
+            requireAal2: config.aal2,
+            permissions: config.permissions,
+            permissionsLogic: config.permissionsLogic,
+            tenantRoles: config.tenantRoles,
+            tenantRolesLogic: config.tenantRolesLogic,
+          },
         )(req, ctx);
 
         // If auth wrapper returned an error response, short-circuit

@@ -10,6 +10,13 @@ export class NotFoundError extends Error {
   }
 }
 
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
+
 export function handleError(error: unknown): NextResponse {
   if (error instanceof ZodError) {
     logger.error({ issues: error.issues }, "Validation failed");
@@ -32,6 +39,17 @@ export function handleError(error: unknown): NextResponse {
         error: "Not Found",
       }),
       { status: 404 },
+    );
+  }
+
+  if (error instanceof ForbiddenError) {
+    return NextResponse.json(
+      formatErrorResponse({
+        statusCode: 403,
+        message: error.message,
+        error: "Forbidden",
+      }),
+      { status: 403 },
     );
   }
 

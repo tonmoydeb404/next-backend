@@ -89,15 +89,16 @@ src/
 
 - Route file location under `src/app/backend/api/v1/<domain>/<resource>/route.ts` _is_ the URL path (`[code]` → `{code}`) — no separate path registration.
 - Define/reuse request+response schemas in `packages/validators` before writing the route file. Never inline a Zod schema in a route file.
-- Add a `<entity>.repository.ts` in `packages/db/src/repositories/` for any table without one; wire its singleton in `apps/publicator/src/lib/api/repositories/index.ts`. Route handlers never touch Drizzle directly.
+- Add a `<entity>.repository.ts` in `packages/db/src/repositories/` for any table without one (framework-agnostic class extending `RepositoryBuilder`, constructor takes `db`); wire its singleton in `apps/publicator/src/lib/api/repositories.ts`. Route handlers never touch Drizzle directly.
 - Every exported method (`GET`/`POST`/etc.) must be built via `createHandler({...})` from `src/lib/api/create-handler.ts` — never a raw `export async function GET(req) {...}`.
 - Never call `.parse()` manually in a route file — pass `params`/`query`/`body` schemas to `createHandler` instead.
-- `auth: true` requires a valid Supabase JWT; add `aal2: true` for staff/publicator-only routes.
+- `auth: true` requires a valid Supabase JWT; add `aal2: true` for staff/publicator-only routes. Use `permissions`/`permissionsLogic` (staff routes, checked against `internal_roles.permissions`) and `tenantRoles`/`tenantRolesLogic` (tenant-scoped routes, checked against the seat for the `x-tenant-id` header) for authorization — never a hand-rolled check inside the handler body. `permissions` must be typed `Permission[]` from `@repo/validators` (never raw strings) — add new `[resource]:[action]` entries to `rolePermissions` in `packages/validators/src/db/auth/permissions.ts` only as each domain is actually built, not ahead of time.
 - `openapi: { summary, tags, responses }` is mandatory on every route — read by `scripts/generate-openapi.ts` to build `public/openapi.json`.
 - Return responses via `formatResponse(...) satisfies <ResponseType>` + `NextResponse.json(...)`. No runtime response validation — `satisfies` is compile-time only.
 - Throw `NotFoundError`/let `ZodError` propagate for errors — never construct an error `NextResponse` by hand; `createHandler` formats both consistently.
 - Business logic stays inline in the handler for simple domains (Geography-style CRUD); extract to `src/lib/api/services/<domain>/<name>.service.ts` for complex ones (Grants, Matching).
 - Regenerate the OpenAPI spec after adding/changing a route: `pnpm --filter publicator generate:openapi` (also runs via `predev`/`prebuild`).
+- After changing `rolePermissions`, re-sync the `super_admin` internal role: `pnpm --filter publicator sync:roles` (idempotent — creates the role if missing, otherwise updates its permissions array; not run automatically on startup, deliberate to avoid permission drift).
 - Async/queue endpoints (`/backend/api/v1/jobs/*`, triggered by Vercel Cron) skip `auth`/`aal2` and check a shared `CRON_SECRET` header instead — there's no user JWT on a cron-triggered request.
 
 ## Common commands
