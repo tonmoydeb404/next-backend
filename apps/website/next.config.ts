@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/backend/api/:path*",
-        destination: `${envConfig.BACKEND.BASE_URL}/api/:path*`,
+        destination: `${envConfig.PUBLICATOR.BASE_URL}/backend/api/:path*`,
       },
     ];
   },

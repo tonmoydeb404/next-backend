@@ -4,19 +4,16 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  // Next.js always forces NODE_ENV=production for `next build`/`next start`, so use this to
-  // distinguish deploy stages (e.g. staging vs production) instead.
   NEXT_PUBLIC_APP_ENV: z
     .enum(["development", "staging", "production"])
     .default("development"),
-  NEXT_PUBLIC_BACKEND_BASE_URL: z.url().default("http://localhost:3000"),
+  NEXT_PUBLIC_PUBLICATOR_BASE_URL: z.url().default("http://localhost:4002"),
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;
 
-// Runs once at module load (next.config.ts, server components/routes) against raw process.env.
 function validate(config: Record<string, unknown>): Env {
   const result = envSchema.safeParse(config);
   if (!result.success) {
@@ -36,8 +33,8 @@ export const envConfig = {
     STAGING: env.NEXT_PUBLIC_APP_ENV === "staging",
     PROD: env.NEXT_PUBLIC_APP_ENV === "production",
   },
-  BACKEND: {
-    BASE_URL: env.NEXT_PUBLIC_BACKEND_BASE_URL,
+  PUBLICATOR: {
+    BASE_URL: env.NEXT_PUBLIC_PUBLICATOR_BASE_URL,
   },
   SUPABASE: {
     URL: env.NEXT_PUBLIC_SUPABASE_URL,

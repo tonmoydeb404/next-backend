@@ -17,6 +17,14 @@ export const BaseResponseSchema = z.object({
   message: z.string().default("Request successful").optional(),
 });
 
+export const errorResponseSchema = z.object({
+  success: z.literal(false),
+  statusCode: z.number().int(),
+  message: z.union([z.string(), z.array(z.string())]),
+  error: z.string(),
+  details: z.array(z.unknown()).optional(),
+});
+
 export const buildResponseSchema = <
   TData extends z.ZodTypeAny,
   TMeta extends z.ZodRawShape = Record<never, never>,
@@ -56,6 +64,8 @@ export const buildPaginatedResponseSchema = <
 // ----------------------------------------------------------------------
 
 export type PaginationMeta = z.infer<typeof PaginationMetaSchema>;
+
+export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
 export type ApiResponse<T, M> = z.infer<typeof BaseResponseSchema> & {
   results: T;

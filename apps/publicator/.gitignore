@@ -38,4 +38,7 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# generated
+/public/openapi.json
 next-env.d.ts
