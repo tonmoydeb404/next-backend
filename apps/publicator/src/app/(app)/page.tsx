@@ -2,6 +2,7 @@
 
 import { ModeToggle } from "@/components/mode-toggle";
 import { cn } from "@/lib/utils";
+import { skipToken } from "@reduxjs/toolkit/query/react";
 import {
   RiCheckboxCircleFill,
   RiCloseCircleFill,
@@ -11,11 +12,18 @@ import {
   RiPulseLine,
   RiRefreshLine,
   RiServerLine,
+  RiShieldKeyholeLine,
+  RiShieldStarLine,
+  RiTeamLine,
 } from "@remixicon/react";
 import {
+  useAal2CheckQuery,
   useHealthCheckQuery,
+  useMeQuery,
+  usePermissionCheckQuery,
   useProvincesListQuery,
   useRegionsListQuery,
+  useTenantRoleCheckQuery,
 } from "@repo/store";
 
 // Bento tile wrapper — shared card chrome for the dashboard grid below.
@@ -53,6 +61,46 @@ function CardHeader({
   );
 }
 
+// Shared pass/fail rendering for the guard-check cards below.
+function GuardCheckCard({
+  icon,
+  title,
+  endpoint,
+  isLoading,
+  isError,
+  detail,
+}: {
+  icon: typeof RiServerLine;
+  title: string;
+  endpoint: string;
+  isLoading: boolean;
+  isError: boolean;
+  detail?: string;
+}) {
+  return (
+    <BentoCard>
+      <CardHeader icon={icon} title={title} />
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Checking…</p>
+      ) : isError ? (
+        <div className="flex items-center gap-2 text-destructive">
+          <RiCloseCircleFill className="size-6" />
+          <span className="text-lg font-semibold">Denied</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <RiCheckboxCircleFill className="size-6 text-emerald-500" />
+          <span className="text-lg font-semibold">Granted</span>
+        </div>
+      )}
+      {detail && !isLoading && (
+        <p className="mt-2 truncate text-xs text-muted-foreground">{detail}</p>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">{endpoint}</p>
+    </BentoCard>
+  );
+}
+
 export default function Home() {
   const {
     data: health,
@@ -63,6 +111,25 @@ export default function Home() {
   const { data: regions, isLoading: regionsLoading } = useRegionsListQuery();
   const { data: provinces, isLoading: provincesLoading } =
     useProvincesListQuery({});
+
+  const { data: me } = useMeQuery();
+  const tenantId = me?.results.seats[0]?.tenantId;
+
+  const {
+    data: aal2,
+    isLoading: aal2Loading,
+    isError: aal2Error,
+  } = useAal2CheckQuery();
+  const {
+    data: permission,
+    isLoading: permissionLoading,
+    isError: permissionError,
+  } = usePermissionCheckQuery();
+  const {
+    data: tenantRole,
+    isLoading: tenantRoleLoading,
+    isError: tenantRoleError,
+  } = useTenantRoleCheckQuery(tenantId ? { tenantId } : skipToken);
 
   const isUp = health?.results.status === "ok";
 
@@ -154,6 +221,32 @@ export default function Home() {
             </p>
             <p className="text-xs text-muted-foreground">geography/provinces</p>
           </BentoCard>
+
+          {/* Guard checks — one card per createHandler guard type */}
+          <GuardCheckCard
+            icon={RiShieldKeyholeLine}
+            title="AAL2 guard"
+            endpoint="debug/aal2"
+            isLoading={aal2Loading}
+            isError={aal2Error}
+            detail={aal2?.results.aal}
+          />
+          <GuardCheckCard
+            icon={RiShieldStarLine}
+            title="Permission guard"
+            endpoint="debug/permission"
+            isLoading={permissionLoading}
+            isError={permissionError}
+            detail={permission?.results.permission}
+          />
+          <GuardCheckCard
+            icon={RiTeamLine}
+            title="Tenant role guard"
+            endpoint="debug/tenant-role"
+            isLoading={tenantRoleLoading}
+            isError={tenantRoleError || !tenantId}
+            detail={tenantRole?.results.activeSeat?.seatRole}
+          />
 
           {/* Region list preview — spans full width */}
           <BentoCard className="sm:col-span-2 lg:col-span-3">
