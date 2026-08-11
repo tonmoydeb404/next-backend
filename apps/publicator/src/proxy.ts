@@ -5,9 +5,8 @@ import { updateSession } from "@/lib/supabase/middleware";
 
 // Next.js 16 renamed middleware.ts's `middleware` export to `proxy` (same semantics).
 export async function proxy(request: NextRequest) {
-  const { response, claims } = await updateSession(request);
-
   const { pathname } = request.nextUrl;
+  const { response, claims } = await updateSession(request);
 
   // Sign-in is guest-only — bounce already-authenticated visitors to the app.
   if (pathname === paths.auth.signIn) {
@@ -35,6 +34,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|backend|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
